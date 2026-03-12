@@ -125,7 +125,20 @@ jobs:
             sed -i "/^  # -- Elasticsearch version/{n;s/version: .*/version: \"${ES}\"/}" chart/values.yaml
           fi
 
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes detected"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Changes detected:"
+            git diff --stat
+          fi
+
       - name: Bump chart version
+        if: steps.changes.outputs.changed == 'true'
         id: bump
         run: |
           CURRENT=$(grep '^version:' chart/Chart.yaml | awk '{print $2}')
@@ -139,6 +152,7 @@ jobs:
           echo "Chart version: ${CURRENT} -> ${NEW_VERSION}"
 
       - name: Update README.md
+        if: steps.changes.outputs.changed == 'true'
         run: |
           INTELOWL="${{ steps.intelowl.outputs.version }}"
           CHART_VERSION="${{ steps.bump.outputs.version }}"
@@ -147,18 +161,6 @@ jobs:
           sed -i "s|AppVersion-[^-]*-informational|AppVersion-${INTELOWL}-informational|" chart/README.md
           # Update Version badge
           sed -i "s|Version-[^-]*-informational|Version-${CHART_VERSION}-informational|" chart/README.md
-
-      - name: Check for changes
-        id: changes
-        run: |
-          if git diff --quiet; then
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "No changes detected"
-          else
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "Changes detected:"
-            git diff --stat
-          fi
 
       - name: Create Pull Request
         if: steps.changes.outputs.changed == 'true'
