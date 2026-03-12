@@ -13,6 +13,9 @@ spec:
       targetPort: flower
       protocol: TCP
       name: flower
+      {{- if and (eq .Values.flower.service.type "NodePort") .Values.flower.service.nodePort }}
+      nodePort: {{ .Values.flower.service.nodePort }}
+      {{- end }}
   selector:
     {{- include "intelowl.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: flower

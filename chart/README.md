@@ -596,6 +596,7 @@ Kubernetes: `>=1.25.0-0`
 | nginx.resources.requests.cpu | string | `"100m"` | CPU request for Nginx |
 | nginx.resources.requests.memory | string | `"128Mi"` | Memory request for Nginx |
 | nginx.service.httpsPort | int | `443` | Nginx HTTPS port |
+| nginx.service.nodePort | string | `""` | NodePort port number (only used when type is NodePort) |
 | nginx.service.port | int | `80` | Nginx HTTP port |
 | nginx.service.type | string | `"ClusterIP"` | Nginx service type |
 | nginx.startupProbe.enabled | bool | `true` | Enable startup probe |
@@ -715,6 +716,7 @@ Kubernetes: `>=1.25.0-0`
 | flower.resources.limits.memory | string | `"512Mi"` | Memory limit for Flower |
 | flower.resources.requests.cpu | string | `"100m"` | CPU request for Flower |
 | flower.resources.requests.memory | string | `"256Mi"` | Memory request for Flower |
+| flower.service.nodePort | string | `""` | NodePort port number (only used when type is NodePort) |
 | flower.service.port | int | `5555` | Flower service port |
 | flower.service.type | string | `"ClusterIP"` | Flower service type |
 | flower.tolerations | list | `[]` | Tolerations for Flower pod |

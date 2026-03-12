@@ -463,6 +463,8 @@ nginx:
     port: 80
     # -- Nginx HTTPS port
     httpsPort: 443
+    # -- NodePort port number (only used when type is NodePort)
+    nodePort: ""
 
   startupProbe:
     # -- Enable startup probe
@@ -748,6 +750,8 @@ flower:
     type: ClusterIP
     # -- Flower service port
     port: 5555
+    # -- NodePort port number (only used when type is NodePort)
+    nodePort: ""
 
   # Ingress for Flower dashboard
   ingress:
