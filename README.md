@@ -1,8 +1,5 @@
 # IntelOwl Helm Chart
 
-[![Release Helm Chart](https://github.com/MaximeWewer/intelowl-helm/actions/workflows/release-helm.yml/badge.svg)](https://github.com/MaximeWewer/intelowl-helm/actions/workflows/release-helm.yml)
-[![Update Versions](https://github.com/MaximeWewer/intelowl-helm/actions/workflows/update-versions.yml/badge.svg)](https://github.com/MaximeWewer/intelowl-helm/actions/workflows/update-versions.yml)
-
 Unofficial Helm chart for deploying [IntelOwl](https://github.com/intelowlproject/IntelOwl) on Kubernetes.
 
 > **IntelOwl** is an open-source intelligence (OSINT) management platform that automates the collection and analysis of threat intelligence data from a single API at scale.
