@@ -21,7 +21,7 @@ maintainers:
   - name: Maxime Wewer
     url: https://github.com/MaximeWewer
 
-icon: https://raw.githubusercontent.com/intelowlproject/IntelOwl/master/docs/static/intel_owl_negative.png
+icon: https://github.com/intelowlproject/IntelOwl/blob/master/static/intel_owl_positive.png
 
 kubeVersion: ">=1.25.0-0"
 
