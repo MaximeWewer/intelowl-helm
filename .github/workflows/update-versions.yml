@@ -137,19 +137,16 @@ jobs:
             git diff --stat
           fi
 
-      - name: Bump chart version
+      - name: Align chart version with IntelOwl
         if: steps.changes.outputs.changed == 'true'
         id: bump
         run: |
-          CURRENT=$(grep '^version:' chart/Chart.yaml | awk '{print $2}')
-          # Bump patch version
-          MAJOR=$(echo "$CURRENT" | cut -d. -f1)
-          MINOR=$(echo "$CURRENT" | cut -d. -f2)
-          PATCH=$(echo "$CURRENT" | cut -d. -f3)
-          NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          # Strip leading 'v' from IntelOwl version to get semver
+          NEW_VERSION="${{ steps.intelowl.outputs.version }}"
+          NEW_VERSION="${NEW_VERSION#v}"
           sed -i "s/^version: .*/version: ${NEW_VERSION}/" chart/Chart.yaml
           echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
-          echo "Chart version: ${CURRENT} -> ${NEW_VERSION}"
+          echo "Chart version set to: ${NEW_VERSION}"
 
       - name: Update README.md
         if: steps.changes.outputs.changed == 'true'
