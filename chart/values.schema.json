@@ -922,7 +922,7 @@
                     "type": "object",
                     "properties": {
                         "nodePort": {
-                            "type": "string"
+                            "type": "null"
                         },
                         "port": {
                             "type": "integer"
@@ -2163,7 +2163,7 @@
                             "type": "integer"
                         },
                         "nodePort": {
-                            "type": "string"
+                            "type": "null"
                         },
                         "port": {
                             "type": "integer"

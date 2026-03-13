@@ -464,7 +464,7 @@ nginx:
     # -- Nginx HTTPS port
     httpsPort: 443
     # -- NodePort port number (only used when type is NodePort)
-    nodePort: ""
+    nodePort:
 
   startupProbe:
     # -- Enable startup probe
@@ -751,7 +751,7 @@ flower:
     # -- Flower service port
     port: 5555
     # -- NodePort port number (only used when type is NodePort)
-    nodePort: ""
+    nodePort:
 
   # Ingress for Flower dashboard
   ingress:
