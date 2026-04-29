@@ -33,9 +33,9 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Build chart dependencies
+      - name: Update chart dependencies
         run: |
-          helm dependency build chart/
+          helm dependency update chart/
 
       - name: Package Helm chart
         run: |

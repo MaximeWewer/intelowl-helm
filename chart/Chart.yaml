@@ -55,8 +55,6 @@ dependencies:
     alias: eck
 
 annotations:
-  artifacthub.io/license: AGPL-3.0
-
   kubernetes.io/minimum-version: "1.25.0"
 
   category: "Security"
