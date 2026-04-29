@@ -2,8 +2,8 @@ apiVersion: v2
 name: intelowl
 description: A Helm chart for deploying IntelOwl - Open Source Intelligence Platform
 type: application
-version: 6.5.1
-appVersion: "v6.5.1"
+version: 6.6.1
+appVersion: "v6.6.1"
 
 keywords:
   - intelowl
@@ -28,21 +28,21 @@ kubeVersion: ">=1.25.0-0"
 dependencies:
   # CloudNative-PG Operator
   - name: cloudnative-pg
-    version: "0.27.*"
+    version: "0.28.*"
     repository: "https://cloudnative-pg.github.io/charts"
     condition: postgresql.operator.enabled
     alias: cnpg
 
   # CloudPirates Redis
   - name: redis
-    version: "0.26.*"
+    version: "0.27.*"
     repository: "oci://registry-1.docker.io/cloudpirates"
     condition: redis.enabled
     alias: redis
 
   # CloudPirates RabbitMQ
   - name: rabbitmq
-    version: "0.19.*"
+    version: "0.21.*"
     repository: "oci://registry-1.docker.io/cloudpirates"
     condition: rabbitmq.enabled
     alias: rabbitmq

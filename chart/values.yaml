@@ -23,7 +23,7 @@ fullnameOverride: ""
 
 app:
   # -- IntelOwl application version
-  version: "v6.5.1"
+  version: "v6.6.1"
 
   django:
     # -- Django secret key (required). Generate with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
@@ -1290,7 +1290,7 @@ elasticsearch:
     enabled: false
 
   # -- Elasticsearch version
-  version: "8.19.12"
+  version: "8.19.14"
   # -- Number of Elasticsearch nodes
   replicas: 1
   # -- Allow mmap (set to true for production performance)
