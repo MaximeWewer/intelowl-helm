@@ -142,8 +142,10 @@ jobs:
         id: bump
         run: |
           # Strip leading 'v' from IntelOwl version to get semver
-          NEW_VERSION="${{ steps.intelowl.outputs.version }}"
-          NEW_VERSION="${NEW_VERSION#v}"
+          BASE="${{ steps.intelowl.outputs.version }}"
+          BASE="${BASE#v}"
+          DATE=$(date -u +'%d-%m-%Y')
+          NEW_VERSION="${BASE}-${DATE}"
           sed -i "s/^version: .*/version: ${NEW_VERSION}/" chart/Chart.yaml
           echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
           echo "Chart version set to: ${NEW_VERSION}"

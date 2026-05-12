@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Install Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@v5
 
       - name: Convert repository owner to lowercase
         id: lowercase
@@ -23,12 +23,10 @@ jobs:
           OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "owner=${OWNER_LOWER}" >> $GITHUB_OUTPUT
 
-      - name: Compute chart version with date suffix
+      - name: Get chart version
         id: chart
         run: |
-          BASE=$(grep '^version:' chart/Chart.yaml | awk '{print $2}')
-          DATE=$(date -u +'%d-%m-%Y')
-          VERSION="${BASE}-${DATE}"
+          VERSION=$(grep '^version:' chart/Chart.yaml | awk '{print $2}')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Login to GitHub Container Registry
@@ -41,7 +39,7 @@ jobs:
 
       - name: Package Helm chart
         run: |
-          helm package chart/ --version ${{ steps.chart.outputs.version }}
+          helm package chart/
 
       - name: Push Helm chart to GHCR
         run: |
