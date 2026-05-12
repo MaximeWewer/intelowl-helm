@@ -1417,7 +1417,7 @@ postgresql:
     # -- PostgreSQL image repository
     repository: ghcr.io/cloudnative-pg/postgresql
     # -- PostgreSQL version tag
-    tag: "16"
+    tag: ""
     # -- Image pull policy
     pullPolicy: IfNotPresent
 

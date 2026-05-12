@@ -9,7 +9,7 @@ Uses pg_isready for proper PostgreSQL readiness check (not just TCP)
     - sh
     - -c
     - |
-      until pg_isready -h {{ include "intelowl.databaseHost" . }} -p {{ include "intelowl.databasePort" . }}; do
+      until pg_isready -h {{ include "intelowl.databaseHost" . }} -p {{ include "intelowl.databasePort" . }} -U {{ include "intelowl.databaseUser" . }} -d {{ include "intelowl.databaseName" . }}; do
         echo "Waiting for database to be ready..."
         sleep 3
       done
