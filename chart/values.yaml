@@ -1290,7 +1290,7 @@ elasticsearch:
     enabled: false
 
   # -- Elasticsearch version
-  version: "8.19.14"
+  version: "8.19.15"
   # -- Number of Elasticsearch nodes
   replicas: 1
   # -- Allow mmap (set to true for production performance)

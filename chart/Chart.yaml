@@ -49,7 +49,7 @@ dependencies:
 
   # ECK Operator (Elastic Cloud on Kubernetes)
   - name: eck-operator
-    version: "3.3.*"
+    version: "3.4.*"
     repository: "https://helm.elastic.co"
     condition: elasticsearch.operator.enabled
     alias: eck
