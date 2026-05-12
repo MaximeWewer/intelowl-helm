@@ -31,28 +31,24 @@ dependencies:
     version: "0.28.*"
     repository: "https://cloudnative-pg.github.io/charts"
     condition: postgresql.operator.enabled
-    alias: cnpg
 
   # CloudPirates Redis
   - name: redis
     version: "0.27.*"
     repository: "oci://registry-1.docker.io/cloudpirates"
     condition: redis.enabled
-    alias: redis
 
   # CloudPirates RabbitMQ
   - name: rabbitmq
     version: "0.21.*"
     repository: "oci://registry-1.docker.io/cloudpirates"
     condition: rabbitmq.enabled
-    alias: rabbitmq
 
   # ECK Operator (Elastic Cloud on Kubernetes)
   - name: eck-operator
     version: "3.4.*"
     repository: "https://helm.elastic.co"
     condition: elasticsearch.operator.enabled
-    alias: eck
 
 annotations:
   kubernetes.io/minimum-version: "1.25.0"

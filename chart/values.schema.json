@@ -948,9 +948,6 @@
                 },
                 "imageRegistry": {
                     "type": "string"
-                },
-                "storageClass": {
-                    "type": "string"
                 }
             }
         },

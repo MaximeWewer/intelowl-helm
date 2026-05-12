@@ -49,8 +49,7 @@ Static volumes for Nginx
 Storage class for PVCs
 */}}
 {{- define "intelowl.storageClass" -}}
-{{- $storageClass := .storageClass | default .Values.global.storageClass -}}
-{{- if $storageClass }}
-storageClassName: {{ $storageClass | quote }}
+{{- if .storageClass }}
+storageClassName: {{ .storageClass | quote }}
 {{- end }}
 {{- end }}

@@ -9,8 +9,6 @@ global:
   imageRegistry: ""
   # -- Global Docker registry secret names as an array
   imagePullSecrets: []
-  # -- Global StorageClass for Persistent Volume(s)
-  storageClass: ""
 
 # @section Common parameters
 
@@ -168,7 +166,7 @@ storage:
     # -- Access modes for generic logs PVC
     accessModes:
       - ReadWriteMany
-    # -- Storage class for generic logs (uses global.storageClass if empty)
+    # -- Storage class for generic logs
     storageClass: ""
 
   # Shared files storage configuration (analyzer results, uploads)
@@ -178,7 +176,7 @@ storage:
     # -- Access modes for shared files PVC
     accessModes:
       - ReadWriteMany
-    # -- Storage class for shared files (uses global.storageClass if empty)
+    # -- Storage class for shared files
     storageClass: ""
 
   # Static content storage configuration (Django static files)
@@ -188,7 +186,7 @@ storage:
     # -- Access modes for static content PVC
     accessModes:
       - ReadWriteMany
-    # -- Storage class for static content (uses global.storageClass if empty)
+    # -- Storage class for static content
     storageClass: ""
 
   # S3 configuration (when localStorage is false)
@@ -1303,7 +1301,7 @@ elasticsearch:
   storage:
     # -- Storage size for Elasticsearch data
     size: "30Gi"
-    # -- Storage class (uses global.storageClass if empty)
+    # -- Storage class
     storageClass: ""
 
   resources:
@@ -1435,7 +1433,7 @@ postgresql:
   storage:
     # -- Storage size for PostgreSQL data
     size: "10Gi"
-    # -- Storage class (uses global.storageClass if empty)
+    # -- Storage class
     storageClass: ""
 
   walStorage:

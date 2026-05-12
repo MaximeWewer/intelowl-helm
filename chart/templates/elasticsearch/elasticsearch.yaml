@@ -43,7 +43,7 @@ spec:
             resources:
               requests:
                 storage: {{ .Values.elasticsearch.storage.size }}
-            {{- if or .Values.elasticsearch.storage.storageClass .Values.global.storageClass }}
-            storageClassName: {{ .Values.elasticsearch.storage.storageClass | default .Values.global.storageClass | quote }}
+            {{- if .Values.elasticsearch.storage.storageClass }}
+            storageClassName: {{ .Values.elasticsearch.storage.storageClass | quote }}
             {{- end }}
 {{- end }}

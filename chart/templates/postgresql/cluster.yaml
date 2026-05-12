@@ -30,15 +30,15 @@ spec:
 
   storage:
     size: {{ .Values.postgresql.storage.size | default "10Gi" }}
-    {{- if or .Values.postgresql.storage.storageClass .Values.global.storageClass }}
-    storageClass: {{ .Values.postgresql.storage.storageClass | default .Values.global.storageClass }}
+    {{- if .Values.postgresql.storage.storageClass }}
+    storageClass: {{ .Values.postgresql.storage.storageClass }}
     {{- end }}
 
   {{- if .Values.postgresql.walStorage.enabled }}
   walStorage:
     size: {{ .Values.postgresql.walStorage.size | default "2Gi" }}
-    {{- if or .Values.postgresql.walStorage.storageClass .Values.global.storageClass }}
-    storageClass: {{ .Values.postgresql.walStorage.storageClass | default .Values.global.storageClass }}
+    {{- if .Values.postgresql.walStorage.storageClass }}
+    storageClass: {{ .Values.postgresql.walStorage.storageClass }}
     {{- end }}
   {{- end }}
 
