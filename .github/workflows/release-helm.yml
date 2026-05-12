@@ -23,10 +23,12 @@ jobs:
           OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "owner=${OWNER_LOWER}" >> $GITHUB_OUTPUT
 
-      - name: Get chart version
+      - name: Compute chart version with date suffix
         id: chart
         run: |
-          VERSION=$(grep '^version:' chart/Chart.yaml | awk '{print $2}')
+          BASE=$(grep '^version:' chart/Chart.yaml | awk '{print $2}')
+          DATE=$(date -u +'%d-%m-%Y')
+          VERSION="${BASE}-${DATE}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Login to GitHub Container Registry
@@ -39,7 +41,7 @@ jobs:
 
       - name: Package Helm chart
         run: |
-          helm package chart/
+          helm package chart/ --version ${{ steps.chart.outputs.version }}
 
       - name: Push Helm chart to GHCR
         run: |
