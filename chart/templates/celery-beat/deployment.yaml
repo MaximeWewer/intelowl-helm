@@ -5,6 +5,10 @@ metadata:
   labels:
     {{- include "intelowl.labels" . | nindent 4 }}
     app.kubernetes.io/component: celery-beat
+  {{- if .Values.postgresql.operator.enabled }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  {{- end }}
 spec:
   # Celery beat must always be a singleton (only 1 replica)
   replicas: 1

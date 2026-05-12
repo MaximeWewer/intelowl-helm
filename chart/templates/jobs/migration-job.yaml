@@ -7,9 +7,13 @@ metadata:
     {{- include "intelowl.labels" . | nindent 4 }}
     app.kubernetes.io/component: migration
   annotations:
-    "helm.sh/hook": pre-install,pre-upgrade
-    "helm.sh/hook-weight": "-5"
+    {{- include "intelowl.installOrder" (dict "ctx" . "wave" "2" "weight" "-5") | nindent 4 }}
+    {{- if .Values.postgresql.operator.enabled }}
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    {{- else }}
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    {{- end }}
 spec:
   backoffLimit: 3
   activeDeadlineSeconds: {{ .Values.migration.timeout }}

@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install tools
         run: |
@@ -154,10 +154,12 @@ jobs:
           INTELOWL="${{ steps.intelowl.outputs.version }}"
           CHART_VERSION="${{ steps.bump.outputs.version }}"
 
-          # Update AppVersion badge
+          # Chart README badges
           sed -i "s|AppVersion-[^-]*-informational|AppVersion-${INTELOWL}-informational|" chart/README.md
-          # Update Version badge
           sed -i "s|Version-[^-]*-informational|Version-${CHART_VERSION}-informational|" chart/README.md
+
+          # Root README — bump targetRevision used in the Argo CD example
+          sed -i "s|targetRevision: \"[^\"]*\"|targetRevision: \"${CHART_VERSION}\"|" README.md
 
       - name: Create Pull Request
         if: steps.changes.outputs.changed == 'true'

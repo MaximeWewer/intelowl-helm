@@ -5,6 +5,10 @@ metadata:
   labels:
     {{- include "intelowl.labels" . | nindent 4 }}
     app.kubernetes.io/component: uwsgi
+  {{- if .Values.postgresql.operator.enabled }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  {{- end }}
 spec:
   {{- if not .Values.uwsgi.autoscaling.enabled }}
   replicas: {{ .Values.uwsgi.replicaCount }}

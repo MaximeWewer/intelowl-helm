@@ -4,10 +4,37 @@ Unofficial Helm chart for deploying [IntelOwl](https://github.com/intelowlprojec
 
 > **IntelOwl** is an open-source intelligence (OSINT) management platform that automates the collection and analysis of threat intelligence data from a single API at scale.
 
-## Quick Start
+> **Deployment target:** this chart is designed for [Argo CD](https://argo-cd.readthedocs.io/). When `postgresql.operator.enabled=true`, install ordering relies on `argocd.argoproj.io/sync-wave` annotations rather than Helm hooks (the CNPG operator subchart must come up before the `Cluster` CR can reconcile). Plain `helm install` still works in the `operator.enabled=false` mode (operator preinstalled), where classic Helm pre/post-install hooks are emitted.
 
-```bash
-helm install intelowl oci://ghcr.io/maximewewer/charts/intelowl
+## Quick Start (Argo CD)
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: intelowl
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/maximewewer/charts
+    chart: intelowl
+    targetRevision: "6.6.1"
+    helm:
+      values: |
+        postgresql:
+          operator:
+            enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: intelowl
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
 ```
 
 ## Features
@@ -27,11 +54,18 @@ helm install intelowl oci://ghcr.io/maximewewer/charts/intelowl
 
 ## Installation
 
-### From OCI registry (recommended)
+### Argo CD (recommended)
+
+The chart ships with `argocd.argoproj.io/sync-wave` annotations to order resources when the CNPG operator is deployed as a subchart. See the [Quick Start](#quick-start-argo-cd) above.
+
+### Plain Helm (operator preinstalled)
+
+Only when `postgresql.operator.enabled=false` (CloudNative-PG installed separately at cluster scope):
 
 ```bash
 helm install intelowl oci://ghcr.io/maximewewer/charts/intelowl \
   --namespace intelowl --create-namespace \
+  --set postgresql.operator.enabled=false \
   --set app.django.secretKey="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')"
 ```
 
@@ -40,9 +74,10 @@ helm install intelowl oci://ghcr.io/maximewewer/charts/intelowl \
 ```bash
 git clone https://github.com/MaximeWewer/intelowl-helm.git
 cd intelowl-helm
-helm dependency build chart/
+helm dependency update chart/
 helm install intelowl chart/ \
   --namespace intelowl --create-namespace \
+  --set postgresql.operator.enabled=false \
   --set app.django.secretKey="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')"
 ```
 

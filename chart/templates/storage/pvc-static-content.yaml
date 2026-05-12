@@ -8,8 +8,7 @@ metadata:
     app.kubernetes.io/component: storage
   {{- if .Values.migration.enabled }}
   annotations:
-    "helm.sh/hook": pre-install,pre-upgrade
-    "helm.sh/hook-weight": "-15"
+    {{- include "intelowl.installOrder" (dict "ctx" . "wave" "0" "weight" "-15" "keep" true) | nindent 4 }}
     "helm.sh/resource-policy": keep
   {{- end }}
 spec:

@@ -7,9 +7,15 @@ metadata:
     {{- include "intelowl.labels" . | nindent 4 }}
     app.kubernetes.io/component: superuser
   annotations:
+    {{- if .Values.postgresql.operator.enabled }}
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    {{- else }}
     "helm.sh/hook": post-install
     "helm.sh/hook-weight": "5"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    {{- end }}
 spec:
   backoffLimit: 3
   activeDeadlineSeconds: 300
