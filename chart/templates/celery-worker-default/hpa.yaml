@@ -6,6 +6,10 @@ metadata:
   labels:
     {{- include "intelowl.labels" . | nindent 4 }}
     app.kubernetes.io/component: celery-worker-default
+  {{- if .Values.postgresql.operator.enabled }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  {{- end }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

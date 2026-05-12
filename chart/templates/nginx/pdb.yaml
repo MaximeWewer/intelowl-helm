@@ -6,6 +6,10 @@ metadata:
   labels:
     {{- include "intelowl.labels" . | nindent 4 }}
     app.kubernetes.io/component: nginx
+  {{- if .Values.postgresql.operator.enabled }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  {{- end }}
 spec:
   minAvailable: {{ .Values.nginx.pdb.minAvailable }}
   selector:
