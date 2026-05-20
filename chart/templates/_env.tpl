@@ -59,6 +59,8 @@ Common environment variables for all IntelOwl services
   value: {{ .Values.app.logLevel | quote }}
 - name: DEFAULT_TIMEOUT
   value: {{ .Values.app.defaultTimeout | quote }}
+- name: STAGE
+  value: "production"
 {{- if .Values.app.baseUrl }}
 - name: BASE_URL
   value: {{ .Values.app.baseUrl | quote }}
@@ -169,4 +171,6 @@ Used by the migration job which runs before Redis/RabbitMQ are available
   value: {{ .Values.app.django.allowedHosts | quote }}
 - name: LOG_LEVEL
   value: {{ .Values.app.logLevel | quote }}
+- name: STAGE
+  value: "production"
 {{- end }}

@@ -6,6 +6,7 @@ metadata:
     {{- include "intelowl.labels" . | nindent 4 }}
 data:
   # Application settings
+  STAGE: "production"
   DEBUG: {{ .Values.app.django.debug | quote }}
   LOG_LEVEL: {{ .Values.app.logLevel | quote }}
   DEFAULT_TIMEOUT: {{ .Values.app.defaultTimeout | quote }}
