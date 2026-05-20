@@ -42,7 +42,7 @@ data:
   # Elasticsearch settings
   {{- if .Values.elasticsearch.enabled }}
   ELASTICSEARCH_DSL_ENABLED: "True"
-  ELASTICSEARCH_DSL_HOST: {{ printf "%s-es-http" (include "intelowl.fullname" .) | quote }}
+  ELASTICSEARCH_DSL_HOST: {{ printf "http://%s-es-http:9200" (include "intelowl.fullname" .) | quote }}
   ELASTICSEARCH_DSL_PORT: "9200"
   {{- end }}
 

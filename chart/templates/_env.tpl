@@ -97,7 +97,7 @@ Common environment variables for all IntelOwl services
 - name: ELASTICSEARCH_DSL_ENABLED
   value: "True"
 - name: ELASTICSEARCH_DSL_HOST
-  value: {{ printf "%s-es-http" (include "intelowl.fullname" .) | quote }}
+  value: {{ printf "http://%s-es-http:9200" (include "intelowl.fullname" .) | quote }}
 - name: ELASTICSEARCH_DSL_PORT
   value: "9200"
 - name: ELASTICSEARCH_DSL_PASSWORD

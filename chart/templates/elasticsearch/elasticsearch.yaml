@@ -8,6 +8,10 @@ metadata:
     app.kubernetes.io/component: elasticsearch
 spec:
   version: {{ .Values.elasticsearch.version | quote }}
+  http:
+    tls:
+      selfSignedCertificate:
+        disabled: true
   nodeSets:
     - name: default
       count: {{ .Values.elasticsearch.replicas }}
