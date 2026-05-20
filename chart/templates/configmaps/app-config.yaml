@@ -34,14 +34,14 @@ data:
 
   # HTTPS settings
   {{- if .Values.app.httpsEnabled }}
-  HTTPS_ENABLED: "true"
+  HTTPS_ENABLED: "True"
   {{- else }}
-  HTTPS_ENABLED: "false"
+  HTTPS_ENABLED: "False"
   {{- end }}
 
   # Elasticsearch settings
   {{- if .Values.elasticsearch.enabled }}
-  ELASTICSEARCH_DSL_ENABLED: "true"
+  ELASTICSEARCH_DSL_ENABLED: "True"
   ELASTICSEARCH_DSL_HOST: {{ printf "%s-es-http" (include "intelowl.fullname" .) | quote }}
   ELASTICSEARCH_DSL_PORT: "9200"
   {{- end }}
@@ -64,14 +64,14 @@ data:
 
   # Storage settings
   {{- if .Values.storage.s3.enabled }}
-  USE_S3: "true"
+  USE_S3: "True"
   AWS_STORAGE_BUCKET_NAME: {{ .Values.storage.s3.bucket | quote }}
   AWS_S3_REGION_NAME: {{ .Values.storage.s3.region | quote }}
   {{- if .Values.storage.s3.endpoint }}
   AWS_S3_ENDPOINT_URL: {{ .Values.storage.s3.endpoint | quote }}
   {{- end }}
   {{- else }}
-  USE_S3: "false"
+  USE_S3: "False"
   {{- end }}
 
   # Service URLs (internal)

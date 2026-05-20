@@ -62,6 +62,8 @@ Common environment variables for all IntelOwl services
 {{- if .Values.app.baseUrl }}
 - name: BASE_URL
   value: {{ .Values.app.baseUrl | quote }}
+- name: INTELOWL_WEB_CLIENT_DOMAIN
+  value: {{ regexReplaceAll "^https?://" .Values.app.baseUrl "" | quote }}
 {{- end }}
 {{- if .Values.storage.s3.enabled }}
 - name: AWS_STORAGE_BUCKET_NAME
@@ -89,11 +91,11 @@ Common environment variables for all IntelOwl services
   value: {{ .Values.app.oldJobsRetentionDays | quote }}
 {{- if .Values.app.httpsEnabled }}
 - name: HTTPS_ENABLED
-  value: "true"
+  value: "True"
 {{- end }}
 {{- if .Values.elasticsearch.enabled }}
 - name: ELASTICSEARCH_DSL_ENABLED
-  value: "true"
+  value: "True"
 - name: ELASTICSEARCH_DSL_HOST
   value: {{ printf "%s-es-http" (include "intelowl.fullname" .) | quote }}
 - name: ELASTICSEARCH_DSL_PORT
