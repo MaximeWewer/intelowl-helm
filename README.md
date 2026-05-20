@@ -19,7 +19,7 @@ spec:
   source:
     repoURL: ghcr.io/maximewewer/charts
     chart: intelowl
-    targetRevision: "6.6.1-12-05-2026-4"
+    targetRevision: "6.6.1-20-05-2026"
     helm:
       values: |
         postgresql:
