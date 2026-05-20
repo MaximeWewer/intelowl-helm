@@ -51,7 +51,7 @@ spec:
             - --loglevel={{ .Values.app.logLevel }}
             - --concurrency={{ .Values.multiQueue.workerIngestor.concurrency }}
             - -Q
-            - ingestor
+            - ingestor,broadcast,config
             - --without-heartbeat
             - --without-gossip
             - --without-mingle

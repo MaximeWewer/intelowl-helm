@@ -60,7 +60,7 @@ spec:
             - --loglevel={{ .Values.app.logLevel }}
             - --concurrency={{ .Values.celeryWorkerDefault.concurrency }}
             - -Q
-            - default
+            - default,config,broadcast
             - --without-heartbeat
             - --without-gossip
             - --without-mingle

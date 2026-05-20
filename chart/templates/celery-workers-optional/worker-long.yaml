@@ -51,7 +51,7 @@ spec:
             - --loglevel={{ .Values.app.logLevel }}
             - --concurrency={{ .Values.multiQueue.workerLong.concurrency }}
             - -Q
-            - long
+            - long,broadcast,config
             - --without-heartbeat
             - --without-gossip
             - --without-mingle
