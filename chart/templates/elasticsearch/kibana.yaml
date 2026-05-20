@@ -10,7 +10,7 @@ spec:
   version: {{ .Values.elasticsearch.version | quote }}
   count: {{ .Values.elasticsearch.kibana.replicas }}
   elasticsearchRef:
-    name: {{ include "intelowl.fullname" . }}-es
+    name: {{ include "intelowl.fullname" . }}
   podTemplate:
     spec:
       {{- with .Values.elasticsearch.kibana.nodeSelector }}

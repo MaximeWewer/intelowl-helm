@@ -101,7 +101,7 @@ Common environment variables for all IntelOwl services
 - name: ELASTICSEARCH_DSL_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ include "intelowl.fullname" . }}-es-es-elastic-user
+      name: {{ include "intelowl.fullname" . }}-es-elastic-user
       key: elastic
 {{- end }}
 {{- if .Values.app.slack.enabled }}

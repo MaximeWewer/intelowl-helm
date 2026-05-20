@@ -211,7 +211,7 @@ Gateway API:
 {{- if .Values.elasticsearch.enabled }}
 Elasticsearch:
   - Elasticsearch (ECK): {{ .Values.elasticsearch.replicas }} node(s), version {{ .Values.elasticsearch.version }}
-    Service: {{ include "intelowl.fullname" . }}-es-es-http
+    Service: {{ include "intelowl.fullname" . }}-es-http
   {{- if .Values.elasticsearch.kibana.enabled }}
   - Kibana Dashboard: Enabled
     kubectl port-forward svc/{{ include "intelowl.fullname" . }}-kibana-kb-http 5601:5601 -n {{ .Release.Namespace }}
