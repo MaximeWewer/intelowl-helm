@@ -26,7 +26,7 @@ data:
 
   {{- if .Values.app.baseUrl }}
   BASE_URL: {{ .Values.app.baseUrl | quote }}
-  INTELOWL_WEB_CLIENT_DOMAIN: {{ .Values.app.baseUrl | quote }}
+  INTELOWL_WEB_CLIENT_DOMAIN: {{ regexReplaceAll "^https?://" .Values.app.baseUrl "" | quote }}
   {{- end }}
 
   # Job retention
