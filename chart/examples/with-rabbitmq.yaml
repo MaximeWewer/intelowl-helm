@@ -2,15 +2,15 @@
 # Use this if you prefer RabbitMQ for Celery task queues
 #
 # Prerequisites:
-# - CloudNative-PG operator installed
 # - Gateway API CRDs installed
+# - CloudNative-PG: deployed by this chart (postgresql.operator.enabled=true)
+#   or pre-installed cluster-wide
 #
-# Install (from helm directory):
-#   cd helm
+# Install (plain helm, operator preinstalled):
+#   cd chart
 #   helm install intelowl . -f examples/with-rabbitmq.yaml -n intelowl --create-namespace
 
 app:
-  version: "v6.5.1"
   django:
     secretKey: "your-secret-key-change-me"
     debug: false
@@ -33,9 +33,13 @@ celeryWorkerDefault:
 # Database
 postgresql:
   enabled: true
+  operator:
+    enabled: true
   instances: 1
+  password: ""
   storage:
     size: "10Gi"
+    storageClass: ""
 
 # Message broker configuration
 broker:
@@ -56,19 +60,21 @@ redis:
   architecture: standalone
   auth:
     enabled: true
+    password: ""
   persistence:
     size: "5Gi"
+    storageClass: ""
 
 # RabbitMQ configuration
 rabbitmq:
   enabled: true
   auth:
     username: "intelowl"
-    # Password will be auto-generated if not provided
-    password: ""
+    password: ""              # Set explicitly for ArgoCD stability
   vhost: "/"
   persistence:
     size: "5Gi"
+    storageClass: ""          # subchart does NOT read any chart-global value
   management:
     enabled: true
   resources:
@@ -83,10 +89,13 @@ rabbitmq:
 storage:
   genericLogs:
     size: "10Gi"
+    storageClass: ""
   sharedFiles:
     size: "20Gi"
+    storageClass: ""
   staticContent:
     size: "5Gi"
+    storageClass: ""
 
 # Gateway API networking
 networking:

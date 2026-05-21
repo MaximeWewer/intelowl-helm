@@ -1,12 +1,26 @@
 # Minikube-specific overrides
-# Minikube's default StorageClass only supports ReadWriteOnce
+# Minikube's default StorageClass (`standard`) only supports ReadWriteOnce.
+# Force RWO and set the storageClass per component because the chart does
+# not expose a global one. Use replicaCount=1 on every Deployment that
+# mounts these PVCs so a single pod owns each PVC.
 storage:
   genericLogs:
     accessModes:
       - ReadWriteOnce
+    storageClass: "standard"
   sharedFiles:
     accessModes:
       - ReadWriteOnce
+    storageClass: "standard"
   staticContent:
     accessModes:
       - ReadWriteOnce
+    storageClass: "standard"
+
+postgresql:
+  storage:
+    storageClass: "standard"
+
+redis:
+  persistence:
+    storageClass: "standard"

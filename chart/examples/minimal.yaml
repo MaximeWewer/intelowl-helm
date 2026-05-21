@@ -1,23 +1,28 @@
 # Minimal IntelOwl deployment for testing
-# This is the simplest configuration to get IntelOwl running
+# Simplest configuration to get IntelOwl running.
 #
 # Prerequisites:
-# - CloudNative-PG operator installed
-# - Gateway API CRDs installed (or set networking.type=ingress)
+# - StorageClass available on the cluster (set storage.*.storageClass below)
+# - Gateway API CRDs installed (or switch networking.type=ingress)
+# - CloudNative-PG operator: deployed by this chart via the subchart
+#   (postgresql.operator.enabled=true) or pre-installed cluster-wide.
 #
-# Install (from helm directory):
-#   cd helm
+# Install (plain helm, operator preinstalled):
+#   cd chart
 #   helm install intelowl . -f examples/minimal.yaml -n intelowl --create-namespace
+#
+# ArgoCD: point the Application at the OCI chart and paste this content
+# under spec.source.helm.values. Keep postgresql.operator.enabled=true so
+# the CNPG subchart deploys in the right sync wave.
 #
 # Access:
 #   kubectl port-forward svc/intelowl-nginx 8080:80 -n intelowl
 #   Open http://localhost:8080
 
 app:
-  version: "v6.5.1"
   django:
     # IMPORTANT: Generate a real secret key for any non-test deployment
-    # python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+    # python3 -c "import secrets, string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(50)))"
     secretKey: "test-secret-key-change-me-in-production"
     debug: false
 
@@ -81,30 +86,44 @@ celeryBeat:
       memory: "512Mi"
       cpu: "250m"
 
-# Single PostgreSQL instance
+# Single PostgreSQL instance.
+# operator.enabled=true deploys CNPG as subchart (recommended for ArgoCD /
+# fresh clusters). Set to false if operator is pre-installed cluster-wide.
 postgresql:
   enabled: true
+  operator:
+    enabled: true
   instances: 1
+  password: ""              # Set explicitly to avoid Argo render-drift
   storage:
     size: "5Gi"
+    storageClass: ""        # e.g. "standard", "nfs", "gp3"
+  walStorage:
+    enabled: false
 
-# Standalone Redis
+# Standalone Redis. replication+sentinel break Celery — the chart does
+# not point to the master-only service when sentinel is on. Keep standalone.
 redis:
   enabled: true
   architecture: standalone
   auth:
     enabled: true
+    password: ""            # Set explicitly to avoid Argo render-drift
   persistence:
     size: "2Gi"
+    storageClass: ""        # subchart does NOT read any chart-global storageClass
 
 # Smaller PVCs for testing
 storage:
   genericLogs:
     size: "2Gi"
+    storageClass: ""
   sharedFiles:
     size: "5Gi"
+    storageClass: ""
   staticContent:
     size: "1Gi"
+    storageClass: ""
 
 # Use Gateway API (default)
 networking:

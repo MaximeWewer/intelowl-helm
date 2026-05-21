@@ -1,8 +1,8 @@
 # Production IntelOwl deployment
-# High availability configuration suitable for production environments
+# High availability configuration suitable for production environments.
 #
 # Features:
-# - HA PostgreSQL with 3 instances and synchronous replication
+# - HA PostgreSQL (3 instances, synchronous replication)
 # - Multiple replicas for all core services
 # - Pod Disruption Budgets enabled
 # - Horizontal Pod Autoscaling
@@ -15,23 +15,30 @@
 # - Network policies
 #
 # Prerequisites:
-# - CloudNative-PG operator installed
-# - Gateway API CRDs installed
-# - Gateway controller (nginx-gateway-fabric) installed
-# - StorageClass with ReadWriteMany support
-# - TLS certificate secret created
+# - Gateway API CRDs installed and a gateway controller (e.g. nginx-gateway-fabric)
+# - StorageClass with ReadWriteMany support (set per component below)
+# - TLS certificate secret already created in the target namespace
+# - CloudNative-PG: deployed by this chart (operator.enabled=true) or
+#   pre-installed cluster-wide.
 #
-# Install (from helm directory):
-#   cd helm
+# Install (plain helm, operator preinstalled):
+#   cd chart
 #   helm install intelowl . -f examples/production.yaml -n intelowl --create-namespace
+#
+# ArgoCD: drop this content into spec.source.helm.values and pin
+#   spec.source.targetRevision to a dated tag (e.g. 6.6.1-DD-MM-YYYY).
+#
+# IMPORTANT for ArgoCD: ALWAYS set explicit values for the random fields
+# below (django.secretKey, postgresql.password, redis.auth.password,
+# superuser.password). Helm `lookup` does not work under ArgoCD, so any
+# `randAlphaNum` fallback regenerates on every sync and causes drift.
 
 app:
-  version: "v6.5.1"
   django:
     # CRITICAL: Generate a unique secret key for production
-    # python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
-    secretKey: "" # Set via --set or secrets management
-    existingSecret: "" # Or use existing secret
+    # python3 -c "import secrets, string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(50)))"
+    secretKey: ""              # MUST be set explicitly
+    existingSecret: ""         # Or reference a pre-created Secret
     debug: false
     allowedHosts: "intelowl.example.com"
   baseUrl: "https://intelowl.example.com"
@@ -43,7 +50,7 @@ app:
   # Slack notifications (optional)
   # slack:
   #   enabled: true
-  #   token: ""  # Set via --set or existingSecret
+  #   token: ""
   #   defaultChannel: "#intelowl-alerts"
 
   # Email notifications (optional)
@@ -52,7 +59,7 @@ app:
   #   host: "smtp.example.com"
   #   port: 587
   #   hostUser: "alerts@example.com"
-  #   hostPassword: ""  # Set via --set or existingSecret
+  #   hostPassword: ""
   #   defaultFromEmail: "intelowl@example.com"
   #   defaultEmail: "admin@example.com"
   #   useTls: true
@@ -156,15 +163,21 @@ multiQueue:
   workerIngestor:
     enabled: false
 
-# HA PostgreSQL with 3 instances
+# HA PostgreSQL with 3 instances. operator.enabled deploys CNPG via the
+# subchart in the right sync wave; set to false if CNPG is pre-installed.
 postgresql:
   enabled: true
+  operator:
+    enabled: true
   instances: 3
+  password: ""              # MUST be set explicitly for ArgoCD stability
   storage:
     size: "50Gi"
+    storageClass: ""        # set to a RWO-capable class
   walStorage:
     enabled: true
     size: "10Gi"
+    storageClass: ""
   synchronous:
     enabled: true
     minSyncReplicas: 1
@@ -177,26 +190,31 @@ postgresql:
       memory: "8Gi"
       cpu: "4"
 
-# Redis with replication
+# Redis: keep architecture=standalone. The chart points the broker URL at
+# the headless service which does not honour Sentinel master discovery,
+# so replication+sentinel breaks Celery (writes hit a replica → READONLY).
 redis:
   enabled: true
-  architecture: replication
+  architecture: standalone
   auth:
     enabled: true
+    password: ""            # MUST be set explicitly for ArgoCD stability
   persistence:
     size: "10Gi"
-  sentinel:
-    enabled: true
-    quorum: 2
+    storageClass: ""        # subchart does NOT read any chart-global value
 
-# Production storage sizes
+# Production storage sizes — set storageClass per component (RWX-capable
+# for the shared ones; the chart does not expose a global storageClass).
 storage:
   genericLogs:
     size: "50Gi"
+    storageClass: ""        # ReadWriteMany
   sharedFiles:
     size: "100Gi"
+    storageClass: ""        # ReadWriteMany
   staticContent:
     size: "10Gi"
+    storageClass: ""        # ReadWriteMany
 
 # Gateway API with TLS
 networking:
@@ -236,8 +254,7 @@ flower:
   auth:
     enabled: true
     username: "admin"
-    # Set password via --set or existingSecret
-    password: ""
+    password: ""              # MUST be set explicitly
   resources:
     requests:
       memory: "256Mi"
@@ -270,15 +287,15 @@ superuser:
   enabled: true
   username: "admin"
   email: "admin@example.com"
-  password: "" # Set via --set (auto-generated if empty)
+  password: ""                # MUST be set explicitly for ArgoCD stability
 
 # Weekly Celery worker restart (prevents memory leaks)
 celeryRestart:
   enabled: true
-  schedule: "0 3 * * 0" # Every Sunday at 3:00 AM
+  schedule: "0 3 * * 0"       # Every Sunday at 3:00 AM
 
 # Log cleanup
 logCleanup:
   enabled: true
-  schedule: "0 2 * * *" # Every day at 2:00 AM
+  schedule: "0 2 * * *"       # Every day at 2:00 AM
   retentionDays: 30

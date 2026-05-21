@@ -2,16 +2,16 @@
 # This example enables several optional Docker-based analyzers
 #
 # Prerequisites:
-# - CloudNative-PG operator installed
 # - Gateway API CRDs installed
 # - Sufficient cluster resources for additional integrations
+# - CloudNative-PG: deployed by this chart (postgresql.operator.enabled=true)
+#   or pre-installed cluster-wide
 #
-# Install (from helm directory):
-#   cd helm
+# Install (plain helm, operator preinstalled):
+#   cd chart
 #   helm install intelowl . -f examples/with-integrations.yaml -n intelowl --create-namespace
 
 app:
-  version: "v6.5.1"
   django:
     secretKey: "your-secret-key-change-me"
     debug: false
@@ -34,27 +34,36 @@ celeryWorkerDefault:
 # Database
 postgresql:
   enabled: true
+  operator:
+    enabled: true
   instances: 1
+  password: ""
   storage:
     size: "10Gi"
+    storageClass: ""
 
-# Redis
+# Standalone Redis (replication+sentinel breaks the chart's broker wiring)
 redis:
   enabled: true
   architecture: standalone
   auth:
     enabled: true
+    password: ""
   persistence:
     size: "5Gi"
+    storageClass: ""
 
 # Storage - larger for integrations data
 storage:
   genericLogs:
     size: "20Gi"
+    storageClass: ""
   sharedFiles:
     size: "50Gi"
+    storageClass: ""
   staticContent:
     size: "5Gi"
+    storageClass: ""
 
 # Gateway API networking
 networking:

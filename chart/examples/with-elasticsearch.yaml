@@ -2,24 +2,25 @@
 # Enables analysis results indexing and visualization
 #
 # Prerequisites:
-# - CloudNative-PG operator installed
 # - Gateway API CRDs installed
-# - ECK operator installed (or will be installed as dependency)
-#   helm repo add elastic https://helm.elastic.co
-#   helm install elastic-operator elastic/eck-operator -n elastic-system --create-namespace
+# - CloudNative-PG: deployed by this chart (postgresql.operator.enabled=true)
+#   or pre-installed cluster-wide
+# - ECK: deployed by this chart (elasticsearch.operator.enabled=true) or
+#   pre-installed cluster-wide:
+#     helm repo add elastic https://helm.elastic.co
+#     helm install elastic-operator elastic/eck-operator -n elastic-system --create-namespace
 #
-# Install (from helm directory):
-#   cd helm
+# Install (plain helm, operators preinstalled):
+#   cd chart
 #   helm install intelowl . -f examples/with-elasticsearch.yaml -n intelowl --create-namespace
 #
 # Access Kibana:
 #   kubectl port-forward svc/intelowl-kibana-kb-http 5601:5601 -n intelowl
-#   Open https://localhost:5601
+#   Open http://localhost:5601 (chart disables ECK self-signed TLS)
 #   Username: elastic
-#   Password: kubectl get secret intelowl-es-es-elastic-user -n intelowl -o jsonpath='{.data.elastic}' | base64 -d
+#   Password: kubectl get secret intelowl-es-elastic-user -n intelowl -o jsonpath='{.data.elastic}' | base64 -d
 
 app:
-  version: "v6.5.1"
   django:
     secretKey: "your-secret-key-change-me"
     debug: false
@@ -42,27 +43,36 @@ celeryWorkerDefault:
 # Database
 postgresql:
   enabled: true
+  operator:
+    enabled: true
   instances: 1
+  password: ""
   storage:
     size: "10Gi"
+    storageClass: ""
 
-# Redis
+# Standalone Redis (replication+sentinel breaks the chart's broker wiring)
 redis:
   enabled: true
   architecture: standalone
   auth:
     enabled: true
+    password: ""
   persistence:
     size: "5Gi"
+    storageClass: ""
 
 # Storage
 storage:
   genericLogs:
     size: "10Gi"
+    storageClass: ""
   sharedFiles:
     size: "20Gi"
+    storageClass: ""
   staticContent:
     size: "5Gi"
+    storageClass: ""
 
 # Gateway API networking
 networking:
@@ -81,7 +91,8 @@ networking:
 
 elasticsearch:
   enabled: true
-  version: "8.19.12"
+  operator:
+    enabled: true
   replicas: 1
 
   # Set to true for production performance (requires vm.max_map_count=262144)
@@ -93,6 +104,7 @@ elasticsearch:
 
   storage:
     size: "30Gi"
+    storageClass: ""
 
   resources:
     requests:
