@@ -94,6 +94,56 @@
                 }
             }
         },
+        "auth": {
+            "type": "object",
+            "properties": {
+                "google": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "clientId": {
+                            "type": "string"
+                        },
+                        "clientSecret": {
+                            "type": "string"
+                        },
+                        "existingSecret": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "ldap": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "config": {
+                            "type": "string"
+                        },
+                        "existingConfigMap": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "radius": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "config": {
+                            "type": "string"
+                        },
+                        "existingConfigMap": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "broker": {
             "type": "object",
             "properties": {

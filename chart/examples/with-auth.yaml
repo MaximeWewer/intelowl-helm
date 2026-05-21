@@ -1,0 +1,169 @@
+# IntelOwl with external authentication backends
+# Demonstrates Google OAuth2, LDAP and RADIUS configuration. Enable
+# whichever you need — backends are independent.
+#
+# Upstream reference:
+#   https://intelowlproject.github.io/docs/IntelOwl/advanced_configuration/#authentication-options
+#
+# Prerequisites:
+# - Gateway API CRDs installed
+# - CloudNative-PG: deployed by this chart (postgresql.operator.enabled=true)
+#   or pre-installed cluster-wide
+# - For Google OAuth2: an OAuth client in Google Cloud Console with
+#   "Authorized redirect URI" = `https://<your-host>/api/auth/google-callback`
+# - For LDAP: a reachable LDAP server (host/port allowed by NetworkPolicy)
+# - For RADIUS: a reachable RADIUS server (UDP 1812 allowed by NetworkPolicy)
+#
+# Install (plain helm, operator preinstalled):
+#   cd chart
+#   helm install intelowl . -f examples/with-auth.yaml -n intelowl --create-namespace
+
+app:
+  django:
+    secretKey: ""             # Set explicitly
+    debug: false
+    allowedHosts: "intelowl.example.com"
+  baseUrl: "https://intelowl.example.com"
+  httpsEnabled: true
+
+# Standard service configuration
+uwsgi:
+  replicaCount: 2
+
+daphne:
+  enabled: true
+  replicaCount: 2
+
+nginx:
+  replicaCount: 2
+
+celeryWorkerDefault:
+  replicaCount: 2
+  concurrency: 4
+
+# Database
+postgresql:
+  enabled: true
+  operator:
+    enabled: true
+  instances: 1
+  password: ""
+  storage:
+    size: "10Gi"
+    storageClass: ""
+
+# Standalone Redis
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: true
+    password: ""
+  persistence:
+    size: "5Gi"
+    storageClass: ""
+
+# Storage
+storage:
+  genericLogs:
+    size: "10Gi"
+    storageClass: ""
+  sharedFiles:
+    size: "20Gi"
+    storageClass: ""
+  staticContent:
+    size: "5Gi"
+    storageClass: ""
+
+# Gateway API networking
+networking:
+  type: "gateway"
+  gateway:
+    create: true
+    gatewayClass:
+      name: "nginx"
+    httpRoute:
+      hostnames:
+        - "intelowl.example.com"
+
+# =====================================
+# Authentication backends
+# =====================================
+
+auth:
+
+  # -- Google OAuth2 -------------------
+  # Backend: `intel_owl.backends.GoogleOAuth2Backend` (via authlib).
+  # The client ID must end with `.apps.googleusercontent.com`, otherwise
+  # IntelOwl silently skips Google registration in AUTHLIB_OAUTH_CLIENTS.
+  google:
+    enabled: true
+    clientId: "REPLACE_ME.apps.googleusercontent.com"
+    clientSecret: "REPLACE_ME"
+    # Alternatively, reference a pre-created Secret with keys
+    # `google-client-id` and `google-client-secret`:
+    # existingSecret: "intelowl-google-oauth"
+
+  # -- LDAP ----------------------------
+  # Backend: `django_auth_ldap.backend.LDAPBackend`. The `config` block
+  # below is mounted at /opt/deploy/intel_owl/configuration/ldap_config.py
+  # and imported by IntelOwl when LDAP_ENABLED=True.
+  # Reference: https://django-auth-ldap.readthedocs.io/
+  ldap:
+    enabled: true
+    config: |
+      import ldap
+      from django_auth_ldap.config import LDAPSearch, GroupOfNamesType
+
+      AUTH_LDAP_SERVER_URI = "ldap://ldap.example.com:389"
+      AUTH_LDAP_BIND_DN = "cn=svc-intelowl,ou=services,dc=example,dc=com"
+      AUTH_LDAP_BIND_PASSWORD = "CHANGE_ME"
+
+      AUTH_LDAP_USER_SEARCH = LDAPSearch(
+          "ou=people,dc=example,dc=com",
+          ldap.SCOPE_SUBTREE,
+          "(uid=%(user)s)",
+      )
+
+      AUTH_LDAP_USER_ATTR_MAP = {
+          "first_name": "givenName",
+          "last_name": "sn",
+          "email": "mail",
+      }
+
+      AUTH_LDAP_GROUP_SEARCH = LDAPSearch(
+          "ou=groups,dc=example,dc=com",
+          ldap.SCOPE_SUBTREE,
+          "(objectClass=groupOfNames)",
+      )
+      AUTH_LDAP_GROUP_TYPE = GroupOfNamesType(name_attr="cn")
+
+      AUTH_LDAP_REQUIRE_GROUP = "cn=intelowl,ou=groups,dc=example,dc=com"
+
+      # Mirror LDAP groups into Django groups
+      AUTH_LDAP_MIRROR_GROUPS = True
+    # Or use a ConfigMap you manage out of band (key: `ldap_config.py`):
+    # existingConfigMap: "intelowl-ldap-config"
+
+  # -- RADIUS --------------------------
+  # Backend: `intel_owl.backends.CustomRADIUSBackend` (django-radius).
+  # The `config` block below is mounted at
+  # /opt/deploy/intel_owl/configuration/radius_config.py and imported by
+  # IntelOwl when RADIUS_AUTH_ENABLED=True.
+  # Reference: https://github.com/robgolding/django-radius
+  radius:
+    enabled: true
+    config: |
+      RADIUS_SERVER = "radius.example.com"
+      RADIUS_PORT = 1812
+      RADIUS_SECRET = b"CHANGE_ME"
+      # Optional: NAS-Identifier sent with Access-Request packets
+      # RADIUS_NAS_IDENTIFIER = "intelowl"
+    # existingConfigMap: "intelowl-radius-config"
+
+# Disable Flower for this auth example
+flower:
+  enabled: false
+
+metrics:
+  enabled: false

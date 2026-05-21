@@ -8,6 +8,7 @@ Common volume mounts for IntelOwl application services
 - name: shared-files
   mountPath: /opt/deploy/intel_owl/files
 {{- end }}
+{{- include "intelowl.authVolumeMounts" . }}
 {{- end }}
 
 {{/*
@@ -21,6 +22,41 @@ Common volumes for IntelOwl application services
 - name: shared-files
   persistentVolumeClaim:
     claimName: {{ include "intelowl.fullname" . }}-shared-files
+{{- end }}
+{{- include "intelowl.authVolumes" . }}
+{{- end }}
+
+{{/*
+Auth config volume mounts (LDAP / RADIUS Python files)
+*/}}
+{{- define "intelowl.authVolumeMounts" -}}
+{{- if .Values.auth.ldap.enabled }}
+- name: ldap-config
+  mountPath: /opt/deploy/intel_owl/configuration/ldap_config.py
+  subPath: ldap_config.py
+  readOnly: true
+{{- end }}
+{{- if .Values.auth.radius.enabled }}
+- name: radius-config
+  mountPath: /opt/deploy/intel_owl/configuration/radius_config.py
+  subPath: radius_config.py
+  readOnly: true
+{{- end }}
+{{- end }}
+
+{{/*
+Auth config volumes (LDAP / RADIUS ConfigMaps)
+*/}}
+{{- define "intelowl.authVolumes" -}}
+{{- if .Values.auth.ldap.enabled }}
+- name: ldap-config
+  configMap:
+    name: {{ .Values.auth.ldap.existingConfigMap | default (printf "%s-ldap-config" (include "intelowl.fullname" .)) }}
+{{- end }}
+{{- if .Values.auth.radius.enabled }}
+- name: radius-config
+  configMap:
+    name: {{ .Values.auth.radius.existingConfigMap | default (printf "%s-radius-config" (include "intelowl.fullname" .)) }}
 {{- end }}
 {{- end }}
 

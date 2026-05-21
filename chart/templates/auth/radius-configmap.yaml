@@ -1,0 +1,14 @@
+{{- if .Values.auth.radius.enabled }}
+{{- if not .Values.auth.radius.existingConfigMap }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "intelowl.fullname" . }}-radius-config
+  labels:
+    {{- include "intelowl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: auth-radius
+data:
+  radius_config.py: |-
+{{ .Values.auth.radius.config | indent 4 }}
+{{- end }}
+{{- end }}

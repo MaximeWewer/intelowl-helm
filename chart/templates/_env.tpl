@@ -108,6 +108,27 @@ Common environment variables for all IntelOwl services
       name: {{ include "intelowl.fullname" . }}-es-elastic-user
       key: elastic
 {{- end }}
+{{- if .Values.auth.ldap.enabled }}
+- name: LDAP_ENABLED
+  value: "True"
+{{- end }}
+{{- if .Values.auth.radius.enabled }}
+- name: RADIUS_AUTH_ENABLED
+  value: "True"
+{{- end }}
+{{- if .Values.auth.google.enabled }}
+{{- $googleSecret := .Values.auth.google.existingSecret | default (printf "%s-google-oauth" (include "intelowl.fullname" .)) }}
+- name: GOOGLE_CLIENT_ID
+  valueFrom:
+    secretKeyRef:
+      name: {{ $googleSecret }}
+      key: google-client-id
+- name: GOOGLE_CLIENT_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ $googleSecret }}
+      key: google-client-secret
+{{- end }}
 {{- if .Values.app.slack.enabled }}
 - name: SLACK_TOKEN
   valueFrom:

@@ -2,8 +2,6 @@
 
 A Helm chart for deploying IntelOwl - Open Source Intelligence Platform
 
-![Version: 6.5.1](https://img.shields.io/badge/Version-6.6.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v6.5.1](https://img.shields.io/badge/AppVersion-v6.6.1-informational?style=flat-square)
-
 ## Prerequisites
 
 - Kubernetes 1.25+
@@ -94,27 +92,81 @@ kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheu
 
 ## Installation
 
-### Install from source
+### Argo CD (recommended)
+
+This chart is designed for Argo CD. When `postgresql.operator.enabled=true`, ordering relies on `argocd.argoproj.io/sync-wave` annotations rather than Helm hooks (the CNPG operator subchart must come up before the `Cluster` CR can reconcile).
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: intelowl
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/maximewewer/charts
+    chart: intelowl
+    targetRevision: "<see chart Chart.yaml>"
+    helm:
+      values: |
+        app:
+          django:
+            secretKey: "<50-char random — set explicitly to avoid drift>"
+        postgresql:
+          operator:
+            enabled: true
+          password: "<32-char random>"
+        redis:
+          architecture: standalone
+          auth:
+            password: "<32-char random>"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: intelowl
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  # Required if your StatefulSet feature-gate `MaxUnavailableStatefulSet` is off:
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/updateStrategy/rollingUpdate/maxUnavailable
+```
+
+> Helm `lookup` does not work in Argo CD's `helm template` render. Always set explicit values for `app.django.secretKey`, `postgresql.password`, `redis.auth.password`, and (when enabled) `superuser.password` / `flower.auth.password` to avoid every sync regenerating the secrets and rolling pods.
+
+### Plain Helm (operator preinstalled)
+
+Only when `postgresql.operator.enabled=false` (CloudNative-PG installed separately at cluster scope):
 
 ```bash
-cd intelowl-helm
+cd chart
 helm install intelowl . -f examples/minimal.yaml -n intelowl --create-namespace
 ```
 
 ### Generate Django Secret Key
 
 ```bash
-python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+python3 -c "import secrets, string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(50)))"
 ```
 
 ### Example installations
 
 ```bash
-# Basic installation with Gateway API (default)
+# Basic installation with Gateway API (default), CNPG via subchart
 helm install intelowl . \
   --namespace intelowl \
   --create-namespace \
-  --set app.django.secretKey="your-secret-key"
+  --set app.django.secretKey="your-secret-key" \
+  --set postgresql.operator.enabled=true \
+  --set postgresql.password="your-postgres-password" \
+  --set redis.auth.password="your-redis-password"
 
 # With traditional Ingress
 helm install intelowl . \
@@ -130,6 +182,7 @@ helm install intelowl . \
   --namespace intelowl \
   --create-namespace \
   --set app.django.secretKey="your-secret-key" \
+  --set postgresql.operator.enabled=true \
   --set postgresql.instances=3 \
   --set postgresql.synchronous.enabled=true \
   --set multiQueue.enabled=true \
@@ -142,14 +195,16 @@ helm install intelowl . \
   --set app.django.secretKey="your-secret-key" \
   --set broker.type=rabbitmq \
   --set broker.rabbitmq.internal=true \
-  --set rabbitmq.enabled=true
+  --set rabbitmq.enabled=true \
+  --set rabbitmq.auth.password="your-rabbitmq-password"
 
-# With Elasticsearch and Kibana
+# With Elasticsearch and Kibana (ECK self-signed TLS is disabled in this chart)
 helm install intelowl . \
   --namespace intelowl \
   --create-namespace \
   --set app.django.secretKey="your-secret-key" \
   --set elasticsearch.enabled=true \
+  --set elasticsearch.operator.enabled=true \
   --set elasticsearch.kibana.enabled=true
 
 # With automatic superuser creation
@@ -161,6 +216,15 @@ helm install intelowl . \
   --set superuser.username=admin \
   --set superuser.email=admin@example.com \
   --set superuser.password="your-strong-password"
+
+# With external authentication (Google OAuth2)
+helm install intelowl . \
+  --namespace intelowl \
+  --create-namespace \
+  --set app.django.secretKey="your-secret-key" \
+  --set auth.google.enabled=true \
+  --set auth.google.clientId="<id>.apps.googleusercontent.com" \
+  --set auth.google.clientSecret="<secret>"
 ```
 
 ## Getting Started
@@ -277,6 +341,10 @@ The chart provisions three PVCs by default:
 
 All PVCs require `ReadWriteMany` access mode for multi-replica deployments.
 
+> **StorageClass:** the chart does **not** expose a chart-wide `global.storageClass`. Set the StorageClass explicitly per component: `storage.{genericLogs,sharedFiles,staticContent}.storageClass`, `postgresql.storage.storageClass`, `postgresql.walStorage.storageClass`, `elasticsearch.storage.storageClass`, `redis.persistence.storageClass`, `rabbitmq.persistence.storageClass`. The redis and rabbitmq subcharts in particular ignore any chart-global StorageClass.
+
+> **Redis architecture:** keep `redis.architecture: standalone`. The chart wires the broker URL at the regular service which round-robins across all redis pods, so `replication+sentinel` causes Celery writes to hit replicas (`READONLY` errors) and jobs hang.
+
 ## Upgrading
 
 ```bash
@@ -367,10 +435,10 @@ Kubernetes: `>=1.25.0-0`
 
 | Repository | Name | Version |
 |------------|------|---------|
-| https://cloudnative-pg.github.io/charts | cnpg(cloudnative-pg) | 0.27.* |
-| https://helm.elastic.co | eck(eck-operator) | 3.3.* |
-| oci://registry-1.docker.io/cloudpirates | rabbitmq(rabbitmq) | 0.18.* |
-| oci://registry-1.docker.io/cloudpirates | redis(redis) | 0.26.* |
+| https://cloudnative-pg.github.io/charts | cloudnative-pg | 0.28.* |
+| https://helm.elastic.co | eck-operator | 3.4.* |
+| oci://registry-1.docker.io/cloudpirates | rabbitmq | 0.21.* |
+| oci://registry-1.docker.io/cloudpirates | redis | 0.27.* |
 
 ## Values
 
@@ -380,7 +448,6 @@ Kubernetes: `>=1.25.0-0`
 |-----|------|---------|-------------|
 | global.imagePullSecrets | list | `[]` | Global Docker registry secret names as an array |
 | global.imageRegistry | string | `""` | Global Docker image registry |
-| global.storageClass | string | `""` | Global StorageClass for Persistent Volume(s) |
 
 ### Common parameters
 
@@ -416,7 +483,24 @@ Kubernetes: `>=1.25.0-0`
 | app.slack.enabled | bool | `false` | Enable Slack notifications |
 | app.slack.existingSecret | string | `""` | Use existing secret for Slack token (key: slack-token) |
 | app.slack.token | string | `""` | Slack API token |
-| app.version | string | `"v6.5.1"` | IntelOwl application version |
+| app.version | string | `"v6.6.1"` | IntelOwl application version |
+
+### Authentication parameters
+
+External authentication backends. Mirrors the upstream documentation: https://intelowlproject.github.io/docs/IntelOwl/advanced_configuration/#authentication-options.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| auth.google.clientId | string | `""` | OAuth2 Client ID (must end with `.apps.googleusercontent.com`) |
+| auth.google.clientSecret | string | `""` | OAuth2 Client Secret |
+| auth.google.enabled | bool | `false` | Enable Google OAuth2 backend |
+| auth.google.existingSecret | string | `""` | Use existing secret with keys `google-client-id` and `google-client-secret` |
+| auth.ldap.config | string | `"# import ldap\n# from django_auth_ldap.config import LDAPSearch, PosixGroupType\n# AUTH_LDAP_SERVER_URI = \"ldap://ldap.example.com\"\n# AUTH_LDAP_BIND_DN = \"cn=admin,dc=example,dc=com\"\n# AUTH_LDAP_BIND_PASSWORD = \"changeme\"\n# AUTH_LDAP_USER_SEARCH = LDAPSearch(\n#     \"ou=people,dc=example,dc=com\",\n#     ldap.SCOPE_SUBTREE,\n#     \"(uid=%(user)s)\",\n# )\n"` | Inline Python content of `configuration/ldap_config.py`. See django-auth-ldap docs. |
+| auth.ldap.enabled | bool | `false` | Enable LDAP backend (`LDAP_ENABLED=True`) |
+| auth.ldap.existingConfigMap | string | `""` | Use existing ConfigMap with key `ldap_config.py` instead of `config` |
+| auth.radius.config | string | `"# RADIUS_SERVER = \"radius.example.com\"\n# RADIUS_PORT = 1812\n# RADIUS_SECRET = b\"shared-secret\"\n"` | Inline Python content of `configuration/radius_config.py`. See django-radius docs. |
+| auth.radius.enabled | bool | `false` | Enable RADIUS backend (`RADIUS_AUTH_ENABLED=True`) |
+| auth.radius.existingConfigMap | string | `""` | Use existing ConfigMap with key `radius_config.py` instead of `config` |
 
 ### Database parameters
 
@@ -460,7 +544,7 @@ Kubernetes: `>=1.25.0-0`
 |-----|------|---------|-------------|
 | storage.genericLogs.accessModes | list | `["ReadWriteMany"]` | Access modes for generic logs PVC |
 | storage.genericLogs.size | string | `"10Gi"` | Storage size for generic logs |
-| storage.genericLogs.storageClass | string | `""` | Storage class for generic logs (uses global.storageClass if empty) |
+| storage.genericLogs.storageClass | string | `""` | Storage class for generic logs |
 | storage.localStorage | bool | `true` | Use local storage (PVCs). Set to false for cloud storage (S3) |
 | storage.s3.accessKeyId | string | `""` | AWS access key ID |
 | storage.s3.bucket | string | `""` | S3 bucket name |
@@ -471,10 +555,10 @@ Kubernetes: `>=1.25.0-0`
 | storage.s3.secretAccessKey | string | `""` | AWS secret access key |
 | storage.sharedFiles.accessModes | list | `["ReadWriteMany"]` | Access modes for shared files PVC |
 | storage.sharedFiles.size | string | `"20Gi"` | Storage size for shared files |
-| storage.sharedFiles.storageClass | string | `""` | Storage class for shared files (uses global.storageClass if empty) |
+| storage.sharedFiles.storageClass | string | `""` | Storage class for shared files |
 | storage.staticContent.accessModes | list | `["ReadWriteMany"]` | Access modes for static content PVC |
 | storage.staticContent.size | string | `"5Gi"` | Storage size for static content |
-| storage.staticContent.storageClass | string | `""` | Storage class for static content (uses global.storageClass if empty) |
+| storage.staticContent.storageClass | string | `""` | Storage class for static content |
 
 ### uWSGI parameters
 
@@ -945,9 +1029,9 @@ Kubernetes: `>=1.25.0-0`
 | elasticsearch.resources.requests.cpu | string | `"500m"` | CPU request for Elasticsearch |
 | elasticsearch.resources.requests.memory | string | `"2Gi"` | Memory request for Elasticsearch |
 | elasticsearch.storage.size | string | `"30Gi"` | Storage size for Elasticsearch data |
-| elasticsearch.storage.storageClass | string | `""` | Storage class (uses global.storageClass if empty) |
+| elasticsearch.storage.storageClass | string | `""` | Storage class |
 | elasticsearch.tolerations | list | `[]` | Tolerations for Elasticsearch pods |
-| elasticsearch.version | string | `"8.19.12"` | Elasticsearch version |
+| elasticsearch.version | string | `"8.19.15"` | Elasticsearch version |
 
 ### Superuser parameters
 
@@ -991,7 +1075,7 @@ Kubernetes: `>=1.25.0-0`
 | postgresql.existingSecret | string | `""` | Use existing secret for credentials |
 | postgresql.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy |
 | postgresql.image.repository | string | `"ghcr.io/cloudnative-pg/postgresql"` | PostgreSQL image repository |
-| postgresql.image.tag | string | `"16"` | PostgreSQL version tag |
+| postgresql.image.tag | string | `""` | PostgreSQL version tag |
 | postgresql.initdb.postInitSQL | list | `[]` | Post-init SQL statements |
 | postgresql.instances | int | `1` | Number of PostgreSQL instances (1 for dev, 3 for HA) |
 | postgresql.monitoring.enabled | bool | `false` | Enable PostgreSQL monitoring |
@@ -1005,7 +1089,7 @@ Kubernetes: `>=1.25.0-0`
 | postgresql.resources.requests.cpu | string | `"100m"` | CPU request for PostgreSQL |
 | postgresql.resources.requests.memory | string | `"256Mi"` | Memory request for PostgreSQL |
 | postgresql.storage.size | string | `"10Gi"` | Storage size for PostgreSQL data |
-| postgresql.storage.storageClass | string | `""` | Storage class (uses global.storageClass if empty) |
+| postgresql.storage.storageClass | string | `""` | Storage class |
 | postgresql.synchronous.enabled | bool | `false` | Enable synchronous replication (requires instances > 1) |
 | postgresql.synchronous.maxSyncReplicas | int | `2` | Maximum synchronous replicas |
 | postgresql.synchronous.minSyncReplicas | int | `1` | Minimum synchronous replicas |
@@ -1073,6 +1157,8 @@ Example value files are provided in the `examples/` directory:
 | `with-rabbitmq.yaml`     | Using RabbitMQ instead of Redis as broker        |
 | `with-integrations.yaml` | Enabling optional analyzer integrations          |
 | `with-elasticsearch.yaml`| Elasticsearch + Kibana for results indexing      |
+| `with-auth.yaml`         | External authentication: Google OAuth2 / LDAP / RADIUS |
+| `minikube-overrides.yaml`| Minikube-specific overrides (RWO storageClass)   |
 
 ## Testing
 
