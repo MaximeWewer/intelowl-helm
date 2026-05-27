@@ -93,7 +93,10 @@ elasticsearch:
   enabled: true
   operator:
     enabled: true
-  replicas: 1
+  # Use >=2 nodes so the IntelOwl `plugin-report-*` indices (1 replica)
+  # keep replica shards assignable and the cluster stays green. A single
+  # node leaves them UNASSIGNED (yellow) and blocks ArgoCD health checks.
+  replicas: 2
 
   # Set to true for production performance (requires vm.max_map_count=262144)
   allowMmap: false
