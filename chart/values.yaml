@@ -1344,7 +1344,7 @@ elasticsearch:
   # replica shards UNASSIGNED (yellow) and blocks ArgoCD health checks.
   replicas: 2
   # -- Allow mmap (set to true for production performance)
-  allowMmap: false
+  allowMmap: true
 
   # -- Additional Elasticsearch configuration
   config: {}

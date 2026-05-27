@@ -1005,7 +1005,7 @@ External authentication backends. Mirrors the upstream documentation: https://in
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | elasticsearch.affinity | object | `{}` | Affinity rules for Elasticsearch pods |
-| elasticsearch.allowMmap | bool | `false` | Allow mmap (set to true for production performance) |
+| elasticsearch.allowMmap | bool | `true` | Allow mmap (set to true for production performance) |
 | elasticsearch.config | object | `{}` | Additional Elasticsearch configuration |
 | elasticsearch.enabled | bool | `false` | Enable Elasticsearch for analysis results indexing |
 | elasticsearch.kibana.enabled | bool | `true` | Enable Kibana dashboard |
@@ -1023,7 +1023,7 @@ External authentication backends. Mirrors the upstream documentation: https://in
 | elasticsearch.kibana.tolerations | list | `[]` | Tolerations for Kibana pods |
 | elasticsearch.nodeSelector | object | `{}` | Node selector for Elasticsearch pods |
 | elasticsearch.operator.enabled | bool | `false` | Install ECK operator via this chart (set to false if ECK operator is already installed) |
-| elasticsearch.replicas | int | `1` | Number of Elasticsearch nodes |
+| elasticsearch.replicas | int | `2` | Number of Elasticsearch nodes. Use >=2 so IntelOwl's `plugin-report-*` indices (created with 1 replica) keep their replica shards assignable and the cluster stays green. A single node leaves replica shards UNASSIGNED (yellow) and blocks ArgoCD health checks. |
 | elasticsearch.resources.limits.cpu | string | `"2"` | CPU limit for Elasticsearch |
 | elasticsearch.resources.limits.memory | string | `"4Gi"` | Memory limit for Elasticsearch |
 | elasticsearch.resources.requests.cpu | string | `"500m"` | CPU request for Elasticsearch |
