@@ -1337,7 +1337,7 @@ elasticsearch:
     enabled: false
 
   # -- Elasticsearch version
-  version: "8.19.16"
+  version: "8.19.17"
   # -- Number of Elasticsearch nodes. Use >=2 so IntelOwl's
   # `plugin-report-*` indices (created with 1 replica) keep their replica
   # shards assignable and the cluster stays green. A single node leaves
