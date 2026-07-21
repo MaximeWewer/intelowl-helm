@@ -17,13 +17,19 @@ Params:
   ctx    : root context (.)
   wave   : argocd sync-wave value (string)
   weight : helm.sh/hook-weight value (string)
+  phases : (optional) hook phases, defaults to "pre-install,pre-upgrade".
+           Stateful resources (PVCs, the CNPG Cluster) must pass "pre-install":
+           helm deletes a hook resource before recreating it (the implicit
+           before-hook-creation delete policy, which "helm.sh/resource-policy:
+           keep" does not override), so keeping them in the pre-upgrade phase
+           destroys the volumes and the database on every `helm upgrade`.
   keep   : (optional) if "true", keep resource across helm uninstall — only meaningful in hook mode
 */}}
 {{- define "intelowl.installOrder" -}}
 {{- if .ctx.Values.postgresql.operator.enabled }}
 argocd.argoproj.io/sync-wave: "{{ .wave }}"
 {{- else }}
-"helm.sh/hook": pre-install,pre-upgrade
+"helm.sh/hook": {{ .phases | default "pre-install,pre-upgrade" }}
 "helm.sh/hook-weight": "{{ .weight }}"
 {{- end }}
 {{- end -}}

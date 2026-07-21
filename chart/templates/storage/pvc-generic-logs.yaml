@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/component: storage
   {{- if .Values.migration.enabled }}
   annotations:
-    {{- include "intelowl.installOrder" (dict "ctx" . "wave" "0" "weight" "-15" "keep" true) | nindent 4 }}
+    {{- include "intelowl.installOrder" (dict "ctx" . "wave" "0" "weight" "-15" "keep" true "phases" "pre-install") | nindent 4 }}
     "helm.sh/resource-policy": keep
   {{- end }}
 spec:

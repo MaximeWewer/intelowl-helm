@@ -373,6 +373,8 @@ One `ServiceMonitor` per enabled component is created when `metrics.serviceMonit
 
 ## Upgrading
 
+> **Plain Helm mode (`postgresql.operator.enabled=false`):** the PVCs and the CNPG `Cluster` are `pre-install` hooks only. Helm deletes a hook resource before recreating it, and `helm.sh/resource-policy: keep` does not prevent that, so keeping them in `pre-upgrade` would wipe the volumes and the database on every upgrade. The trade-off is that changes to `storage.*` or `postgresql.*` are **not** applied by `helm upgrade` in that mode — edit the `Cluster`/PVC objects directly, or use the Argo CD mode (`postgresql.operator.enabled=true`) where sync-waves are used instead of hooks.
+
 ```bash
 helm upgrade intelowl . \
   --namespace intelowl \
@@ -461,10 +463,10 @@ Kubernetes: `>=1.25.0-0`
 
 | Repository | Name | Version |
 |------------|------|---------|
-| https://cloudnative-pg.github.io/charts | cloudnative-pg | 0.28.* |
+| https://cloudnative-pg.github.io/charts | cloudnative-pg | 0.29.* |
 | https://helm.elastic.co | eck-operator | 3.4.* |
 | oci://registry-1.docker.io/cloudpirates | rabbitmq | 0.21.* |
-| oci://registry-1.docker.io/cloudpirates | redis | 0.30.* |
+| oci://registry-1.docker.io/cloudpirates | redis | 0.32.* |
 
 ## Values
 
@@ -509,7 +511,7 @@ Kubernetes: `>=1.25.0-0`
 | app.slack.enabled | bool | `false` | Enable Slack notifications |
 | app.slack.existingSecret | string | `""` | Use existing secret for Slack token (key: slack-token) |
 | app.slack.token | string | `""` | Slack API token |
-| app.version | string | `"v6.6.1"` | IntelOwl application version |
+| app.version | string | `"v6.7.0"` | IntelOwl application version |
 
 ### Authentication parameters
 
@@ -1106,7 +1108,7 @@ External authentication backends. Mirrors the upstream documentation: https://in
 | elasticsearch.storage.size | string | `"30Gi"` | Storage size for Elasticsearch data |
 | elasticsearch.storage.storageClass | string | `""` | Storage class |
 | elasticsearch.tolerations | list | `[]` | Tolerations for Elasticsearch pods |
-| elasticsearch.version | string | `"8.19.16"` | Elasticsearch version |
+| elasticsearch.version | string | `"8.19.18"` | Elasticsearch version |
 
 ### Superuser parameters
 

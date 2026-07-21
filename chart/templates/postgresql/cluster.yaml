@@ -9,7 +9,7 @@ metadata:
   annotations:
     argocd.argoproj.io/health-check-enabled: "false"
   {{- if .Values.migration.enabled }}
-    {{- include "intelowl.installOrder" (dict "ctx" . "wave" "1" "weight" "-10") | nindent 4 }}
+    {{- include "intelowl.installOrder" (dict "ctx" . "wave" "1" "weight" "-10" "phases" "pre-install") | nindent 4 }}
   {{- end }}
 spec:
   instances: {{ .Values.postgresql.instances | default 1 }}
