@@ -1,0 +1,121 @@
+{{- if include "intelowl.metrics.celery.enabled" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "intelowl.fullname" . }}-celery-exporter
+  labels:
+    {{- include "intelowl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: celery-exporter
+  {{- if .Values.postgresql.operator.enabled }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "intelowl.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: celery-exporter
+  template:
+    metadata:
+      annotations:
+        {{- include "intelowl.metrics.podAnnotations" (dict "port" .Values.metrics.celery.port) | nindent 8 }}
+      labels:
+        {{- include "intelowl.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: celery-exporter
+    spec:
+      {{- include "intelowl.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "intelowl.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        {{- include "intelowl.waitForRedisInitContainer" . | nindent 8 }}
+      containers:
+        - name: celery-exporter
+          image: "{{ .Values.metrics.celery.image.repository }}:{{ .Values.metrics.celery.image.tag }}"
+          imagePullPolicy: {{ .Values.metrics.celery.image.pullPolicy }}
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          args:
+            - --broker-url=$(BROKER_URL)
+            - --host=0.0.0.0
+            - --port={{ .Values.metrics.celery.port }}
+            {{- with .Values.metrics.celery.queues }}
+            - --queues={{ join "," . }}
+            {{- end }}
+            {{- with .Values.metrics.celery.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            {{- if eq .Values.broker.type "rabbitmq" }}
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "intelowl.rabbitmqSecretName" . }}
+                  key: {{ include "intelowl.rabbitmqPasswordKey" . }}
+            {{- else }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "intelowl.redisSecretName" . }}
+                  key: {{ include "intelowl.redisPasswordKey" . }}
+            {{- end }}
+            - name: BROKER_URL
+              value: {{ include "intelowl.brokerUrl" . | quote }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.metrics.celery.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.metrics.celery.resources | nindent 12 }}
+      {{- with .Values.celeryWorkerDefault.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.celeryWorkerDefault.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.celeryWorkerDefault.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "intelowl.fullname" . }}-celery-exporter
+  labels:
+    {{- include "intelowl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: celery-exporter
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.metrics.celery.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "intelowl.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: celery-exporter
+{{- end }}

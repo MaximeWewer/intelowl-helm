@@ -20,11 +20,6 @@ spec:
     metadata:
       annotations:
         checksum/secret: {{ include (print $.Template.BasePath "/secrets/app-secrets.yaml") . | sha256sum }}
-        {{- if .Values.metrics.enabled }}
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8011"
-        prometheus.io/path: "/metrics"
-        {{- end }}
       labels:
         {{- include "intelowl.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: daphne

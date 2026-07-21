@@ -1,0 +1,99 @@
+{{- if include "intelowl.metrics.elasticsearch.enabled" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "intelowl.fullname" . }}-elasticsearch-exporter
+  labels:
+    {{- include "intelowl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: elasticsearch-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "intelowl.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: elasticsearch-exporter
+  template:
+    metadata:
+      annotations:
+        {{- include "intelowl.metrics.podAnnotations" (dict "port" .Values.metrics.elasticsearch.port) | nindent 8 }}
+      labels:
+        {{- include "intelowl.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: elasticsearch-exporter
+    spec:
+      {{- include "intelowl.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "intelowl.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: elasticsearch-exporter
+          image: "{{ .Values.metrics.elasticsearch.image.repository }}:{{ .Values.metrics.elasticsearch.image.tag }}"
+          imagePullPolicy: {{ .Values.metrics.elasticsearch.image.pullPolicy }}
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          args:
+            - --es.uri=http://{{ include "intelowl.fullname" . }}-es-http:9200
+            - --web.listen-address=:{{ .Values.metrics.elasticsearch.port }}
+            {{- with .Values.metrics.elasticsearch.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            - name: ES_USERNAME
+              value: "elastic"
+            - name: ES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "intelowl.fullname" . }}-es-elastic-user
+                  key: elastic
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.metrics.elasticsearch.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.metrics.elasticsearch.resources | nindent 12 }}
+      {{- with .Values.elasticsearch.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.elasticsearch.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "intelowl.fullname" . }}-elasticsearch-exporter
+  labels:
+    {{- include "intelowl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: elasticsearch-exporter
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.metrics.elasticsearch.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "intelowl.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: elasticsearch-exporter
+{{- end }}

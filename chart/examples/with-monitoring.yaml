@@ -1,0 +1,79 @@
+# Prometheus monitoring example
+#
+# IntelOwl has no built-in /metrics endpoint, so each component is instrumented
+# with its own exporter. Every exporter is opt-in.
+#
+# Requires the Prometheus Operator CRDs (ServiceMonitor) when
+# metrics.serviceMonitor.enabled is true:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm install kube-prometheus prometheus-community/kube-prometheus-stack -n monitoring --create-namespace
+#
+# Usage:
+#   helm install intelowl . -f examples/with-monitoring.yaml
+
+metrics:
+  enabled: true
+
+  serviceMonitor:
+    enabled: true
+    interval: "30s"
+    scrapeTimeout: "10s"
+    # kube-prometheus-stack only selects ServiceMonitors carrying its release label
+    labels:
+      release: kube-prometheus
+
+  # Django/uWSGI: workers, requests, memory (sidecar reading the uWSGI stats socket)
+  uwsgi:
+    enabled: true
+
+  # Nginx: connections, requests (sidecar reading stub_status)
+  nginx:
+    enabled: true
+
+  # Flower native /metrics: task runtime, worker state
+  flower:
+    enabled: true
+
+  # celery-exporter: queue lengths and task events.
+  # Also adds `-E` to the Celery workers so they emit task events.
+  celery:
+    enabled: true
+
+  # elasticsearch-exporter: cluster health, indices (needs elasticsearch.enabled)
+  elasticsearch:
+    enabled: false
+
+# Flower must be deployed for metrics.flower to have a target
+flower:
+  enabled: true
+  auth:
+    enabled: true
+    username: "flower"
+    # password auto-generated in the chart secret when empty
+
+# PostgreSQL: CloudNativePG ships its own exporter (port 9187)
+postgresql:
+  monitoring:
+    enabled: true
+    podMonitor: true
+
+# Redis subchart exporter (CloudPirates chart)
+redis:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      labels:
+        release: kube-prometheus
+
+# RabbitMQ subchart exporter (only when broker.type=rabbitmq)
+# rabbitmq:
+#   metrics:
+#     enabled: true
+#     serviceMonitor:
+#       enabled: true
+
+# When NetworkPolicies are on, allow the Prometheus namespace to scrape
+networkPolicy:
+  enabled: false
+  monitoringNamespace: "monitoring"

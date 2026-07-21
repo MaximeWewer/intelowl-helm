@@ -78,7 +78,7 @@ elasticsearch:
 
 ### Prometheus CRDs (Optional - for metrics/monitoring)
 
-If you enable `metrics.serviceMonitor` or `metrics.podMonitor`, the [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) CRDs must be installed **before** deploying the chart, otherwise Helm will fail with `no matches for kind "ServiceMonitor"` or `"PodMonitor"`.
+If you enable `metrics.serviceMonitor` (or `postgresql.monitoring.podMonitor`), the [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) CRDs must be installed **before** deploying the chart, otherwise Helm will fail with `no matches for kind "ServiceMonitor"` or `"PodMonitor"`.
 
 ```bash
 # Option A: Install the full kube-prometheus-stack (includes CRDs + Prometheus + Grafana)
@@ -345,6 +345,32 @@ All PVCs require `ReadWriteMany` access mode for multi-replica deployments.
 
 > **Redis architecture:** keep `redis.architecture: standalone`. The chart wires the broker URL at the regular service which round-robins across all redis pods, so `replication+sentinel` causes Celery writes to hit replicas (`READONLY` errors) and jobs hang.
 
+## Monitoring
+
+IntelOwl itself ships **no** Prometheus endpoint (no `django-prometheus`, no `/metrics` route), so each component is instrumented separately. Everything is opt-in behind the `metrics.enabled` master switch, and each exporter has its own `metrics.<component>.enabled` flag.
+
+| Component               | Source of the metrics                                | Port   | Value                                       |
+| ----------------------- | ---------------------------------------------------- | ------ | ------------------------------------------- |
+| uWSGI (Django API)      | sidecar `uwsgi-exporter` reading the uWSGI stats socket | `9117` | `metrics.uwsgi.enabled`                     |
+| Nginx                   | sidecar `nginx-prometheus-exporter` reading `stub_status` | `9113` | `metrics.nginx.enabled`                     |
+| Celery tasks / workers  | Flower's native `/metrics` endpoint                   | `5555` | `metrics.flower.enabled` (needs `flower.enabled`) |
+| Celery queues / events  | `celery-exporter` deployment (adds `-E` to the workers) | `9808` | `metrics.celery.enabled`                    |
+| Elasticsearch           | `elasticsearch-exporter` deployment                   | `9114` | `metrics.elasticsearch.enabled`             |
+| PostgreSQL              | CloudNativePG built-in exporter                       | `9187` | `postgresql.monitoring.podMonitor`          |
+| Redis / RabbitMQ        | subchart exporters (CloudPirates)                     | `9121` / `15692` | `redis.metrics.*` / `rabbitmq.metrics.*` |
+
+Daphne (ASGI/WebSockets) exposes no metrics endpoint and has no exporter.
+
+```bash
+helm install intelowl . -f examples/with-monitoring.yaml
+```
+
+One `ServiceMonitor` per enabled component is created when `metrics.serviceMonitor.enabled=true`. Pods also carry `prometheus.io/scrape` annotations for annotation-based scrapers. When `networkPolicy.enabled=true`, `networkPolicy.monitoringNamespace` (default `monitoring`) is allowed to reach the metrics ports.
+
+**Flower authentication:** Flower 2.x serves `/metrics` **without** authentication even when `flower.auth.enabled=true`, so no credentials are needed to scrape it. If you front Flower with your own authenticating proxy, set `metrics.flower.basicAuth.enabled=true`; the chart then stores the username in its secret (`flower-username`) and the ServiceMonitor references it. With `flower.auth.existingSecret`, point `metrics.flower.basicAuth.secretName`/`usernameKey`/`passwordKey` at a secret holding **both** keys.
+
+**Celery task events:** enabling `metrics.celery.enabled` replaces `--without-heartbeat` with `-E` on every Celery worker, which is what Flower and `celery-exporter` need to see task and worker events.
+
 ## Upgrading
 
 ```bash
@@ -438,7 +464,7 @@ Kubernetes: `>=1.25.0-0`
 | https://cloudnative-pg.github.io/charts | cloudnative-pg | 0.28.* |
 | https://helm.elastic.co | eck-operator | 3.4.* |
 | oci://registry-1.docker.io/cloudpirates | rabbitmq | 0.21.* |
-| oci://registry-1.docker.io/cloudpirates | redis | 0.27.* |
+| oci://registry-1.docker.io/cloudpirates | redis | 0.30.* |
 
 ## Values
 
@@ -943,6 +969,7 @@ External authentication backends. Mirrors the upstream documentation: https://in
 | networkPolicy.allowExternalEgress | bool | `true` | Allow external egress (required for analyzers that need internet access) |
 | networkPolicy.allowedNamespaces | list | `[]` | Allow traffic from specific namespaces |
 | networkPolicy.enabled | bool | `false` | Enable network policies |
+| networkPolicy.monitoringNamespace | string | `"monitoring"` | Namespace running Prometheus, allowed to scrape the metrics ports when metrics.enabled |
 
 ### RBAC parameters
 
@@ -990,15 +1017,63 @@ External authentication backends. Mirrors the upstream documentation: https://in
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| metrics.enabled | bool | `false` | Enable Prometheus metrics |
-| metrics.podMonitor.enabled | bool | `false` | Enable PodMonitor for Prometheus Operator |
-| metrics.podMonitor.interval | string | `"30s"` | Scrape interval |
-| metrics.podMonitor.labels | object | `{}` | Additional labels for PodMonitor |
-| metrics.podMonitor.scrapeTimeout | string | `"10s"` | Scrape timeout |
+| metrics.celery.enabled | bool | `false` | Enable the celery-exporter deployment and task events on Celery workers |
+| metrics.celery.extraArgs | list | `[]` | Extra CLI args for celery-exporter |
+| metrics.celery.image.pullPolicy | string | `"IfNotPresent"` | celery-exporter image pull policy |
+| metrics.celery.image.repository | string | `"danihodovic/celery-exporter"` | celery-exporter image repository |
+| metrics.celery.image.tag | string | `"0.12.2"` | celery-exporter image tag |
+| metrics.celery.port | int | `9808` | Port exposed by celery-exporter |
+| metrics.celery.queues | list | `["default","config","broadcast","local","long","ingestor"]` | Queues reported by celery-exporter (queue length gauges) |
+| metrics.celery.resources.limits.cpu | string | `"200m"` | CPU limit for celery-exporter |
+| metrics.celery.resources.limits.memory | string | `"128Mi"` | Memory limit for celery-exporter |
+| metrics.celery.resources.requests.cpu | string | `"10m"` | CPU request for celery-exporter |
+| metrics.celery.resources.requests.memory | string | `"64Mi"` | Memory request for celery-exporter |
+| metrics.elasticsearch.enabled | bool | `false` | Enable the elasticsearch-exporter deployment |
+| metrics.elasticsearch.extraArgs[0] | string | `"--es.indices"` |  |
+| metrics.elasticsearch.extraArgs[1] | string | `"--es.indices_settings"` |  |
+| metrics.elasticsearch.extraArgs[2] | string | `"--es.shards"` |  |
+| metrics.elasticsearch.image.pullPolicy | string | `"IfNotPresent"` | elasticsearch-exporter image pull policy |
+| metrics.elasticsearch.image.repository | string | `"quay.io/prometheuscommunity/elasticsearch-exporter"` | elasticsearch-exporter image repository |
+| metrics.elasticsearch.image.tag | string | `"v1.11.0"` | elasticsearch-exporter image tag |
+| metrics.elasticsearch.port | int | `9114` | Port exposed by elasticsearch-exporter |
+| metrics.elasticsearch.resources.limits.cpu | string | `"200m"` | CPU limit for elasticsearch-exporter |
+| metrics.elasticsearch.resources.limits.memory | string | `"128Mi"` | Memory limit for elasticsearch-exporter |
+| metrics.elasticsearch.resources.requests.cpu | string | `"10m"` | CPU request for elasticsearch-exporter |
+| metrics.elasticsearch.resources.requests.memory | string | `"64Mi"` | Memory request for elasticsearch-exporter |
+| metrics.enabled | bool | `false` | Enable Prometheus metrics. Master switch: every `metrics.<component>` below also requires this to be true |
+| metrics.flower.basicAuth.enabled | bool | `false` | Send basic auth credentials when scraping Flower. Flower 2.x serves /metrics without authentication even when flower.auth.enabled, so this is only needed if you front Flower with your own authenticating proxy |
+| metrics.flower.basicAuth.passwordKey | string | `"flower-password"` | Key containing the Flower password |
+| metrics.flower.basicAuth.secretName | string | `""` | Secret holding Flower credentials for scraping (defaults to the chart-managed app secret, or flower.auth.existingSecret when set) |
+| metrics.flower.basicAuth.usernameKey | string | `"flower-username"` | Key containing the Flower username |
+| metrics.flower.enabled | bool | `false` | Scrape Flower's built-in /metrics endpoint. Requires flower.enabled |
+| metrics.nginx.enabled | bool | `false` | Enable the nginx metrics sidecar (scrapes nginx stub_status) |
+| metrics.nginx.extraArgs | list | `[]` | Extra CLI args for the nginx exporter |
+| metrics.nginx.image.pullPolicy | string | `"IfNotPresent"` | Nginx exporter image pull policy |
+| metrics.nginx.image.repository | string | `"nginx/nginx-prometheus-exporter"` | Nginx exporter image repository |
+| metrics.nginx.image.tag | string | `"1.5.1"` | Nginx exporter image tag |
+| metrics.nginx.port | int | `9113` | Port exposed by the nginx exporter |
+| metrics.nginx.resources.limits.cpu | string | `"100m"` | CPU limit for the nginx exporter |
+| metrics.nginx.resources.limits.memory | string | `"64Mi"` | Memory limit for the nginx exporter |
+| metrics.nginx.resources.requests.cpu | string | `"10m"` | CPU request for the nginx exporter |
+| metrics.nginx.resources.requests.memory | string | `"32Mi"` | Memory request for the nginx exporter |
+| metrics.nginx.statusPort | int | `8080` | Localhost port where nginx serves stub_status |
 | metrics.serviceMonitor.enabled | bool | `false` | Enable ServiceMonitor for Prometheus Operator |
+| metrics.serviceMonitor.honorLabels | bool | `false` | Keep labels exposed by the scraped target on conflict |
 | metrics.serviceMonitor.interval | string | `"30s"` | Scrape interval |
-| metrics.serviceMonitor.labels | object | `{}` | Additional labels for ServiceMonitor |
+| metrics.serviceMonitor.labels | object | `{}` | Additional labels for ServiceMonitor (e.g. `release: kube-prometheus-stack`) |
+| metrics.serviceMonitor.metricRelabelings | list | `[]` | Relabelings applied to samples before ingestion |
+| metrics.serviceMonitor.relabelings | list | `[]` | Relabelings applied to targets before scraping |
 | metrics.serviceMonitor.scrapeTimeout | string | `"10s"` | Scrape timeout |
+| metrics.uwsgi.enabled | bool | `false` | Enable the uWSGI metrics sidecar (scrapes the uWSGI stats socket on :9191) |
+| metrics.uwsgi.extraArgs | list | `[]` | Extra CLI args for the uWSGI exporter |
+| metrics.uwsgi.image.pullPolicy | string | `"IfNotPresent"` | uWSGI exporter image pull policy |
+| metrics.uwsgi.image.repository | string | `"docker.io/timonwong/uwsgi-exporter"` | uWSGI exporter image repository |
+| metrics.uwsgi.image.tag | string | `"v1.3.0"` | uWSGI exporter image tag |
+| metrics.uwsgi.port | int | `9117` | Port exposed by the uWSGI exporter |
+| metrics.uwsgi.resources.limits.cpu | string | `"100m"` | CPU limit for the uWSGI exporter |
+| metrics.uwsgi.resources.limits.memory | string | `"64Mi"` | Memory limit for the uWSGI exporter |
+| metrics.uwsgi.resources.requests.cpu | string | `"10m"` | CPU request for the uWSGI exporter |
+| metrics.uwsgi.resources.requests.memory | string | `"32Mi"` | Memory request for the uWSGI exporter |
 
 ### Elasticsearch parameters (ECK)
 
@@ -1031,7 +1106,7 @@ External authentication backends. Mirrors the upstream documentation: https://in
 | elasticsearch.storage.size | string | `"30Gi"` | Storage size for Elasticsearch data |
 | elasticsearch.storage.storageClass | string | `""` | Storage class |
 | elasticsearch.tolerations | list | `[]` | Tolerations for Elasticsearch pods |
-| elasticsearch.version | string | `"8.19.15"` | Elasticsearch version |
+| elasticsearch.version | string | `"8.19.16"` | Elasticsearch version |
 
 ### Superuser parameters
 
@@ -1158,6 +1233,7 @@ Example value files are provided in the `examples/` directory:
 | `with-integrations.yaml` | Enabling optional analyzer integrations          |
 | `with-elasticsearch.yaml`| Elasticsearch + Kibana for results indexing      |
 | `with-auth.yaml`         | External authentication: Google OAuth2 / LDAP / RADIUS |
+| `with-monitoring.yaml`   | Prometheus metrics for every component           |
 | `minikube-overrides.yaml`| Minikube-specific overrides (RWO storageClass)   |
 
 ## Testing

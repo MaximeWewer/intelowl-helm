@@ -1212,6 +1212,8 @@ networkPolicy:
   allowedNamespaces: []
   # -- Allow external egress (required for analyzers that need internet access)
   allowExternalEgress: true
+  # -- Namespace running Prometheus, allowed to scrape the metrics ports when metrics.enabled
+  monitoringNamespace: "monitoring"
 
 # @section RBAC parameters
 
@@ -1298,12 +1300,23 @@ externalSecrets:
       property: "REDIS_PASSWORD"
 
 # @section Metrics parameters
+# IntelOwl itself does not ship a Prometheus endpoint (no django-prometheus, no /metrics route),
+# so each component is instrumented separately and every exporter is opt-in.
+#   uwsgi         -> sidecar exporter reading the uWSGI stats socket
+#   nginx         -> sidecar exporter reading nginx stub_status
+#   flower        -> Flower's native /metrics endpoint (Celery tasks/workers)
+#   celery        -> celery-exporter deployment (queue lengths, task events)
+#   elasticsearch -> elasticsearch-exporter deployment
+# PostgreSQL uses the CloudNativePG built-in exporter (see postgresql.monitoring),
+# Redis/RabbitMQ use their subchart exporters (redis.metrics / rabbitmq.metrics).
 
 metrics:
-  # -- Enable Prometheus metrics
+  # -- Enable Prometheus metrics. Master switch: every `metrics.<component>` below also
+  # requires this to be true
   enabled: false
 
-  # ServiceMonitor configuration
+  # ServiceMonitor configuration (Prometheus Operator). One ServiceMonitor is created
+  # per enabled component
   serviceMonitor:
     # -- Enable ServiceMonitor for Prometheus Operator
     enabled: false
@@ -1311,19 +1324,152 @@ metrics:
     interval: "30s"
     # -- Scrape timeout
     scrapeTimeout: "10s"
-    # -- Additional labels for ServiceMonitor
+    # -- Additional labels for ServiceMonitor (e.g. `release: kube-prometheus-stack`)
     labels: {}
+    # -- Keep labels exposed by the scraped target on conflict
+    honorLabels: false
+    # -- Relabelings applied to targets before scraping
+    relabelings: []
+    # -- Relabelings applied to samples before ingestion
+    metricRelabelings: []
 
-  # PodMonitor configuration (for Celery workers)
-  podMonitor:
-    # -- Enable PodMonitor for Prometheus Operator
+  # uWSGI exporter (Django application metrics: workers, requests, memory)
+  uwsgi:
+    # -- Enable the uWSGI metrics sidecar (scrapes the uWSGI stats socket on :9191)
     enabled: false
-    # -- Scrape interval
-    interval: "30s"
-    # -- Scrape timeout
-    scrapeTimeout: "10s"
-    # -- Additional labels for PodMonitor
-    labels: {}
+    image:
+      # -- uWSGI exporter image repository
+      repository: "docker.io/timonwong/uwsgi-exporter"
+      # -- uWSGI exporter image tag
+      tag: "v1.3.0"
+      # -- uWSGI exporter image pull policy
+      pullPolicy: "IfNotPresent"
+    # -- Port exposed by the uWSGI exporter
+    port: 9117
+    # -- Extra CLI args for the uWSGI exporter
+    extraArgs: []
+    resources:
+      requests:
+        # -- Memory request for the uWSGI exporter
+        memory: "32Mi"
+        # -- CPU request for the uWSGI exporter
+        cpu: "10m"
+      limits:
+        # -- Memory limit for the uWSGI exporter
+        memory: "64Mi"
+        # -- CPU limit for the uWSGI exporter
+        cpu: "100m"
+
+  # Nginx exporter (connections, requests). Enables a stub_status endpoint bound to localhost
+  nginx:
+    # -- Enable the nginx metrics sidecar (scrapes nginx stub_status)
+    enabled: false
+    image:
+      # -- Nginx exporter image repository
+      repository: "nginx/nginx-prometheus-exporter"
+      # -- Nginx exporter image tag
+      tag: "1.5.1"
+      # -- Nginx exporter image pull policy
+      pullPolicy: "IfNotPresent"
+    # -- Port exposed by the nginx exporter
+    port: 9113
+    # -- Localhost port where nginx serves stub_status
+    statusPort: 8080
+    # -- Extra CLI args for the nginx exporter
+    extraArgs: []
+    resources:
+      requests:
+        # -- Memory request for the nginx exporter
+        memory: "32Mi"
+        # -- CPU request for the nginx exporter
+        cpu: "10m"
+      limits:
+        # -- Memory limit for the nginx exporter
+        memory: "64Mi"
+        # -- CPU limit for the nginx exporter
+        cpu: "100m"
+
+  # Flower native Prometheus endpoint (Celery task runtime, worker state)
+  flower:
+    # -- Scrape Flower's built-in /metrics endpoint. Requires flower.enabled
+    enabled: false
+    basicAuth:
+      # -- Send basic auth credentials when scraping Flower. Flower 2.x serves /metrics
+      # without authentication even when flower.auth.enabled, so this is only needed if
+      # you front Flower with your own authenticating proxy
+      enabled: false
+      # -- Secret holding Flower credentials for scraping (defaults to the chart-managed
+      # app secret, or flower.auth.existingSecret when set)
+      secretName: ""
+      # -- Key containing the Flower username
+      usernameKey: "flower-username"
+      # -- Key containing the Flower password
+      passwordKey: "flower-password"
+
+  # celery-exporter: queue lengths and task events. Adds `-E` (task events) to the workers
+  celery:
+    # -- Enable the celery-exporter deployment and task events on Celery workers
+    enabled: false
+    image:
+      # -- celery-exporter image repository
+      repository: "danihodovic/celery-exporter"
+      # -- celery-exporter image tag
+      tag: "0.12.2"
+      # -- celery-exporter image pull policy
+      pullPolicy: "IfNotPresent"
+    # -- Port exposed by celery-exporter
+    port: 9808
+    # -- Queues reported by celery-exporter (queue length gauges)
+    queues:
+      - "default"
+      - "config"
+      - "broadcast"
+      - "local"
+      - "long"
+      - "ingestor"
+    # -- Extra CLI args for celery-exporter
+    extraArgs: []
+    resources:
+      requests:
+        # -- Memory request for celery-exporter
+        memory: "64Mi"
+        # -- CPU request for celery-exporter
+        cpu: "10m"
+      limits:
+        # -- Memory limit for celery-exporter
+        memory: "128Mi"
+        # -- CPU limit for celery-exporter
+        cpu: "200m"
+
+  # elasticsearch-exporter (cluster health, indices). Requires elasticsearch.enabled
+  elasticsearch:
+    # -- Enable the elasticsearch-exporter deployment
+    enabled: false
+    image:
+      # -- elasticsearch-exporter image repository
+      repository: "quay.io/prometheuscommunity/elasticsearch-exporter"
+      # -- elasticsearch-exporter image tag
+      tag: "v1.11.0"
+      # -- elasticsearch-exporter image pull policy
+      pullPolicy: "IfNotPresent"
+    # -- Port exposed by elasticsearch-exporter
+    port: 9114
+    # -- Extra CLI args for elasticsearch-exporter (e.g. --es.indices)
+    extraArgs:
+      - "--es.indices"
+      - "--es.indices_settings"
+      - "--es.shards"
+    resources:
+      requests:
+        # -- Memory request for elasticsearch-exporter
+        memory: "64Mi"
+        # -- CPU request for elasticsearch-exporter
+        cpu: "10m"
+      limits:
+        # -- Memory limit for elasticsearch-exporter
+        memory: "128Mi"
+        # -- CPU limit for elasticsearch-exporter
+        cpu: "200m"
 
 # @section Elasticsearch parameters (ECK)
 # Requires ECK operator. See: https://www.elastic.co/guide/en/cloud-on-k8s/current/k8s-overview.html

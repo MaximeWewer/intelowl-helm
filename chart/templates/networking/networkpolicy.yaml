@@ -59,6 +59,49 @@ spec:
         - podSelector:
             matchLabels:
               {{- include "intelowl.selectorLabels" . | nindent 14 }}
+{{- $anyMetrics := or (include "intelowl.metrics.uwsgi.enabled" .) (include "intelowl.metrics.nginx.enabled" .) (include "intelowl.metrics.flower.enabled" .) (include "intelowl.metrics.celery.enabled" .) (include "intelowl.metrics.elasticsearch.enabled" .) }}
+{{- if and $anyMetrics .Values.networkPolicy.monitoringNamespace }}
+---
+# Allow Prometheus to scrape the metrics endpoints
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "intelowl.fullname" . }}-metrics
+  labels:
+    {{- include "intelowl.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "intelowl.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.monitoringNamespace }}
+      ports:
+        {{- if include "intelowl.metrics.uwsgi.enabled" . }}
+        - protocol: TCP
+          port: {{ .Values.metrics.uwsgi.port }}
+        {{- end }}
+        {{- if include "intelowl.metrics.nginx.enabled" . }}
+        - protocol: TCP
+          port: {{ .Values.metrics.nginx.port }}
+        {{- end }}
+        {{- if include "intelowl.metrics.flower.enabled" . }}
+        - protocol: TCP
+          port: 5555
+        {{- end }}
+        {{- if include "intelowl.metrics.celery.enabled" . }}
+        - protocol: TCP
+          port: {{ .Values.metrics.celery.port }}
+        {{- end }}
+        {{- if include "intelowl.metrics.elasticsearch.enabled" . }}
+        - protocol: TCP
+          port: {{ .Values.metrics.elasticsearch.port }}
+        {{- end }}
+{{- end }}
 ---
 # Allow traffic to PostgreSQL from IntelOwl
 apiVersion: networking.k8s.io/v1

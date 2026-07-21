@@ -15,6 +15,12 @@ spec:
       {{- if and (eq .Values.nginx.service.type "NodePort") .Values.nginx.service.nodePort }}
       nodePort: {{ .Values.nginx.service.nodePort }}
       {{- end }}
+    {{- if include "intelowl.metrics.nginx.enabled" . }}
+    - port: {{ .Values.metrics.nginx.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+    {{- end }}
   selector:
     {{- include "intelowl.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: nginx

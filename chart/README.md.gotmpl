@@ -78,7 +78,7 @@ elasticsearch:
 
 ### Prometheus CRDs (Optional - for metrics/monitoring)
 
-If you enable `metrics.serviceMonitor` or `metrics.podMonitor`, the [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) CRDs must be installed **before** deploying the chart, otherwise Helm will fail with `no matches for kind "ServiceMonitor"` or `"PodMonitor"`.
+If you enable `metrics.serviceMonitor` (or `postgresql.monitoring.podMonitor`), the [Prometheus Operator](https://github.com/prometheus-operator/prometheus-operator) CRDs must be installed **before** deploying the chart, otherwise Helm will fail with `no matches for kind "ServiceMonitor"` or `"PodMonitor"`.
 
 ```bash
 # Option A: Install the full kube-prometheus-stack (includes CRDs + Prometheus + Grafana)
@@ -344,6 +344,32 @@ All PVCs require `ReadWriteMany` access mode for multi-replica deployments.
 > **StorageClass:** the chart does **not** expose a chart-wide `global.storageClass`. Set the StorageClass explicitly per component: `storage.{genericLogs,sharedFiles,staticContent}.storageClass`, `postgresql.storage.storageClass`, `postgresql.walStorage.storageClass`, `elasticsearch.storage.storageClass`, `redis.persistence.storageClass`, `rabbitmq.persistence.storageClass`. The redis and rabbitmq subcharts in particular ignore any chart-global StorageClass.
 
 > **Redis architecture:** keep `redis.architecture: standalone`. The chart wires the broker URL at the regular service which round-robins across all redis pods, so `replication+sentinel` causes Celery writes to hit replicas (`READONLY` errors) and jobs hang.
+
+## Monitoring
+
+IntelOwl itself ships **no** Prometheus endpoint (no `django-prometheus`, no `/metrics` route), so each component is instrumented separately. Everything is opt-in behind the `metrics.enabled` master switch, and each exporter has its own `metrics.<component>.enabled` flag.
+
+| Component               | Source of the metrics                                | Port   | Value                                       |
+| ----------------------- | ---------------------------------------------------- | ------ | ------------------------------------------- |
+| uWSGI (Django API)      | sidecar `uwsgi-exporter` reading the uWSGI stats socket | `9117` | `metrics.uwsgi.enabled`                     |
+| Nginx                   | sidecar `nginx-prometheus-exporter` reading `stub_status` | `9113` | `metrics.nginx.enabled`                     |
+| Celery tasks / workers  | Flower's native `/metrics` endpoint                   | `5555` | `metrics.flower.enabled` (needs `flower.enabled`) |
+| Celery queues / events  | `celery-exporter` deployment (adds `-E` to the workers) | `9808` | `metrics.celery.enabled`                    |
+| Elasticsearch           | `elasticsearch-exporter` deployment                   | `9114` | `metrics.elasticsearch.enabled`             |
+| PostgreSQL              | CloudNativePG built-in exporter                       | `9187` | `postgresql.monitoring.podMonitor`          |
+| Redis / RabbitMQ        | subchart exporters (CloudPirates)                     | `9121` / `15692` | `redis.metrics.*` / `rabbitmq.metrics.*` |
+
+Daphne (ASGI/WebSockets) exposes no metrics endpoint and has no exporter.
+
+```bash
+helm install intelowl . -f examples/with-monitoring.yaml
+```
+
+One `ServiceMonitor` per enabled component is created when `metrics.serviceMonitor.enabled=true`. Pods also carry `prometheus.io/scrape` annotations for annotation-based scrapers. When `networkPolicy.enabled=true`, `networkPolicy.monitoringNamespace` (default `monitoring`) is allowed to reach the metrics ports.
+
+**Flower authentication:** Flower 2.x serves `/metrics` **without** authentication even when `flower.auth.enabled=true`, so no credentials are needed to scrape it. If you front Flower with your own authenticating proxy, set `metrics.flower.basicAuth.enabled=true`; the chart then stores the username in its secret (`flower-username`) and the ServiceMonitor references it. With `flower.auth.existingSecret`, point `metrics.flower.basicAuth.secretName`/`usernameKey`/`passwordKey` at a secret holding **both** keys.
+
+**Celery task events:** enabling `metrics.celery.enabled` replaces `--without-heartbeat` with `-E` on every Celery worker, which is what Flower and `celery-exporter` need to see task and worker events.
 
 ## Upgrading
 
@@ -739,6 +765,7 @@ Example value files are provided in the `examples/` directory:
 | `with-integrations.yaml` | Enabling optional analyzer integrations          |
 | `with-elasticsearch.yaml`| Elasticsearch + Kibana for results indexing      |
 | `with-auth.yaml`         | External authentication: Google OAuth2 / LDAP / RADIUS |
+| `with-monitoring.yaml`   | Prometheus metrics for every component           |
 | `minikube-overrides.yaml`| Minikube-specific overrides (RWO storageClass)   |
 
 ## Testing

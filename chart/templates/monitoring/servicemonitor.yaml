@@ -1,27 +1,52 @@
 {{- if and .Values.metrics.enabled .Values.metrics.serviceMonitor.enabled }}
+{{- $targets := list }}
+{{- if include "intelowl.metrics.uwsgi.enabled" . }}
+{{- $targets = append $targets (dict "name" "uwsgi" "component" "uwsgi" "port" "metrics" "path" "/metrics") }}
+{{- end }}
+{{- if include "intelowl.metrics.nginx.enabled" . }}
+{{- $targets = append $targets (dict "name" "nginx" "component" "nginx" "port" "metrics" "path" "/metrics") }}
+{{- end }}
+{{- if include "intelowl.metrics.flower.enabled" . }}
+{{- $targets = append $targets (dict "name" "flower" "component" "flower" "port" "flower" "path" "/metrics") }}
+{{- end }}
+{{- if include "intelowl.metrics.celery.enabled" . }}
+{{- $targets = append $targets (dict "name" "celery-exporter" "component" "celery-exporter" "port" "metrics" "path" "/metrics") }}
+{{- end }}
+{{- if include "intelowl.metrics.elasticsearch.enabled" . }}
+{{- $targets = append $targets (dict "name" "elasticsearch-exporter" "component" "elasticsearch-exporter" "port" "metrics" "path" "/metrics") }}
+{{- end }}
+{{- range $target := $targets }}
+---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "intelowl.fullname" . }}
+  name: {{ include "intelowl.fullname" $ }}-{{ $target.name }}
   labels:
-    {{- include "intelowl.labels" . | nindent 4 }}
-    {{- with .Values.metrics.serviceMonitor.labels }}
+    {{- include "intelowl.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $target.component }}
+    {{- with $.Values.metrics.serviceMonitor.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
   selector:
     matchLabels:
-      {{- include "intelowl.selectorLabels" . | nindent 6 }}
+      {{- include "intelowl.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $target.component }}
   namespaceSelector:
     matchNames:
-      - {{ .Release.Namespace }}
+      - {{ $.Release.Namespace }}
   endpoints:
-    - port: uwsgi
-      path: /metrics
-      interval: {{ .Values.metrics.serviceMonitor.interval }}
-      scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout }}
-    - port: stats
-      path: /
-      interval: {{ .Values.metrics.serviceMonitor.interval }}
-      scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout }}
+    - port: {{ $target.port }}
+      path: {{ $target.path }}
+      {{- include "intelowl.metrics.endpointDefaults" $ | nindent 6 }}
+      {{- if and (eq $target.name "flower") $.Values.metrics.flower.basicAuth.enabled }}
+      basicAuth:
+        username:
+          name: {{ include "intelowl.metrics.flowerSecretName" $ }}
+          key: {{ $.Values.metrics.flower.basicAuth.usernameKey }}
+        password:
+          name: {{ include "intelowl.metrics.flowerSecretName" $ }}
+          key: {{ $.Values.metrics.flower.basicAuth.passwordKey }}
+      {{- end }}
+{{- end }}
 {{- end }}

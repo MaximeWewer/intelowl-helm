@@ -20,6 +20,9 @@ spec:
     metadata:
       annotations:
         checksum/secret: {{ include (print $.Template.BasePath "/secrets/app-secrets.yaml") . | sha256sum }}
+        {{- if include "intelowl.metrics.flower.enabled" . }}
+        {{- include "intelowl.metrics.podAnnotations" (dict "port" 5555) | nindent 8 }}
+        {{- end }}
       labels:
         {{- include "intelowl.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: flower

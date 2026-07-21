@@ -21,11 +21,6 @@ spec:
     metadata:
       annotations:
         checksum/secret: {{ include (print $.Template.BasePath "/secrets/app-secrets.yaml") . | sha256sum }}
-        {{- if .Values.metrics.enabled }}
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "9808"
-        prometheus.io/path: "/metrics"
-        {{- end }}
       labels:
         {{- include "intelowl.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: celery-worker-default
@@ -61,7 +56,12 @@ spec:
             - --concurrency={{ .Values.celeryWorkerDefault.concurrency }}
             - -Q
             - default,config,broadcast
+            {{- if include "intelowl.metrics.celery.enabled" . }}
+            # Task events + heartbeats are required by Flower and celery-exporter
+            - -E
+            {{- else }}
             - --without-heartbeat
+            {{- end }}
             - --without-gossip
             - --without-mingle
           env:

@@ -56,6 +56,23 @@ data:
         }
         {{- end }}
 
+        {{- if include "intelowl.metrics.nginx.enabled" . }}
+        # stub_status for the nginx-prometheus-exporter sidecar (localhost only)
+        server {
+            listen 127.0.0.1:{{ .Values.metrics.nginx.statusPort }};
+            server_name _;
+            access_log off;
+
+            location /stub_status {
+                stub_status;
+            }
+
+            location / {
+                return 404;
+            }
+        }
+        {{- end }}
+
         server {
             listen 80;
             server_name _;

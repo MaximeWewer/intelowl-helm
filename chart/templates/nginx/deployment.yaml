@@ -19,6 +19,9 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmaps/nginx-config.yaml") . | sha256sum }}
+        {{- if include "intelowl.metrics.nginx.enabled" . }}
+        {{- include "intelowl.metrics.podAnnotations" (dict "port" .Values.metrics.nginx.port) | nindent 8 }}
+        {{- end }}
       labels:
         {{- include "intelowl.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: nginx
@@ -118,6 +121,9 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.nginx.resources | nindent 12 }}
+        {{- if include "intelowl.metrics.nginx.enabled" . }}
+        {{- include "intelowl.metrics.nginxSidecar" . | nindent 8 }}
+        {{- end }}
       volumes:
         - name: nginx-config
           configMap:

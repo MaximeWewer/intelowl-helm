@@ -22,10 +22,8 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmaps/uwsgi-config.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/secrets/app-secrets.yaml") . | sha256sum }}
-        {{- if .Values.metrics.enabled }}
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "8001"
-        prometheus.io/path: "/metrics"
+        {{- if include "intelowl.metrics.uwsgi.enabled" . }}
+        {{- include "intelowl.metrics.podAnnotations" (dict "port" .Values.metrics.uwsgi.port) | nindent 8 }}
         {{- end }}
       labels:
         {{- include "intelowl.selectorLabels" . | nindent 8 }}
@@ -132,6 +130,9 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.uwsgi.resources | nindent 12 }}
+        {{- if include "intelowl.metrics.uwsgi.enabled" . }}
+        {{- include "intelowl.metrics.uwsgiSidecar" . | nindent 8 }}
+        {{- end }}
       volumes:
         - name: uwsgi-config
           configMap:

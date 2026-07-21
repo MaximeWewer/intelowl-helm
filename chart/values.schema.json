@@ -972,7 +972,10 @@
                     "type": "object",
                     "properties": {
                         "nodePort": {
-                            "type": ["integer", "null"]
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
                         },
                         "port": {
                             "type": "integer"
@@ -1696,23 +1699,6 @@
                 "enabled": {
                     "type": "boolean"
                 },
-                "podMonitor": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        },
-                        "interval": {
-                            "type": "string"
-                        },
-                        "labels": {
-                            "type": "object"
-                        },
-                        "scrapeTimeout": {
-                            "type": "string"
-                        }
-                    }
-                },
                 "serviceMonitor": {
                     "type": "object",
                     "properties": {
@@ -1722,11 +1708,220 @@
                         "interval": {
                             "type": "string"
                         },
+                        "scrapeTimeout": {
+                            "type": "string"
+                        },
                         "labels": {
                             "type": "object"
                         },
-                        "scrapeTimeout": {
-                            "type": "string"
+                        "honorLabels": {
+                            "type": "boolean"
+                        },
+                        "relabelings": {
+                            "type": "array"
+                        },
+                        "metricRelabelings": {
+                            "type": "array"
+                        }
+                    }
+                },
+                "uwsgi": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "image": {
+                            "type": "object",
+                            "properties": {
+                                "repository": {
+                                    "type": "string"
+                                },
+                                "tag": {
+                                    "type": "string"
+                                },
+                                "pullPolicy": {
+                                    "type": "string",
+                                    "enum": [
+                                        "Always",
+                                        "IfNotPresent",
+                                        "Never"
+                                    ]
+                                }
+                            }
+                        },
+                        "port": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 65535
+                        },
+                        "extraArgs": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "resources": {
+                            "type": "object"
+                        }
+                    }
+                },
+                "nginx": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "image": {
+                            "type": "object",
+                            "properties": {
+                                "repository": {
+                                    "type": "string"
+                                },
+                                "tag": {
+                                    "type": "string"
+                                },
+                                "pullPolicy": {
+                                    "type": "string",
+                                    "enum": [
+                                        "Always",
+                                        "IfNotPresent",
+                                        "Never"
+                                    ]
+                                }
+                            }
+                        },
+                        "port": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 65535
+                        },
+                        "extraArgs": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "resources": {
+                            "type": "object"
+                        },
+                        "statusPort": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 65535
+                        }
+                    }
+                },
+                "flower": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "basicAuth": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean"
+                                },
+                                "secretName": {
+                                    "type": "string"
+                                },
+                                "usernameKey": {
+                                    "type": "string"
+                                },
+                                "passwordKey": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "celery": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "image": {
+                            "type": "object",
+                            "properties": {
+                                "repository": {
+                                    "type": "string"
+                                },
+                                "tag": {
+                                    "type": "string"
+                                },
+                                "pullPolicy": {
+                                    "type": "string",
+                                    "enum": [
+                                        "Always",
+                                        "IfNotPresent",
+                                        "Never"
+                                    ]
+                                }
+                            }
+                        },
+                        "port": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 65535
+                        },
+                        "extraArgs": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "resources": {
+                            "type": "object"
+                        },
+                        "queues": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "elasticsearch": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "image": {
+                            "type": "object",
+                            "properties": {
+                                "repository": {
+                                    "type": "string"
+                                },
+                                "tag": {
+                                    "type": "string"
+                                },
+                                "pullPolicy": {
+                                    "type": "string",
+                                    "enum": [
+                                        "Always",
+                                        "IfNotPresent",
+                                        "Never"
+                                    ]
+                                }
+                            }
+                        },
+                        "port": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 65535
+                        },
+                        "extraArgs": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "resources": {
+                            "type": "object"
                         }
                     }
                 }
@@ -1951,6 +2146,9 @@
                 },
                 "enabled": {
                     "type": "boolean"
+                },
+                "monitoringNamespace": {
+                    "type": "string"
                 }
             }
         },
@@ -2210,7 +2408,10 @@
                             "type": "integer"
                         },
                         "nodePort": {
-                            "type": ["integer", "null"]
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
                         },
                         "port": {
                             "type": "integer"

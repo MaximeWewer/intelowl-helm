@@ -52,7 +52,12 @@ spec:
             - --concurrency={{ .Values.multiQueue.workerIngestor.concurrency }}
             - -Q
             - ingestor,broadcast,config
+            {{- if include "intelowl.metrics.celery.enabled" . }}
+            # Task events + heartbeats are required by Flower and celery-exporter
+            - -E
+            {{- else }}
             - --without-heartbeat
+            {{- end }}
             - --without-gossip
             - --without-mingle
           env:
