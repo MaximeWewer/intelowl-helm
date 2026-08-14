@@ -25,13 +25,22 @@
 #   cd chart
 #   helm install intelowl . -f examples/production.yaml -n intelowl --create-namespace
 #
-# ArgoCD: drop this content into spec.source.helm.values and pin
-#   spec.source.targetRevision to a dated tag (e.g. 6.6.1-DD-MM-YYYY).
+# ArgoCD: drop this content into spec.source.helm.values, pin
+#   spec.source.targetRevision to a dated tag (e.g. 6.6.1-DD-MM-YYYY),
+#   and uncomment the `argocd.enabled` block below.
 #
 # IMPORTANT for ArgoCD: ALWAYS set explicit values for the random fields
 # below (django.secretKey, postgresql.password, redis.auth.password,
 # superuser.password). Helm `lookup` does not work under ArgoCD, so any
 # `randAlphaNum` fallback regenerates on every sync and causes drift.
+
+# REQUIRED under ArgoCD — order resources with sync waves instead of Helm
+# hooks. Without it, Argo re-deletes the PVCs and the CNPG Cluster on every
+# sync: the PVCs get stuck in Terminating (pvc-protection finalizer) and
+# deadlock the rollout, and the database CR is destroyed.
+# Leave commented out for a plain `helm install`.
+# argocd:
+#   enabled: true
 
 app:
   django:

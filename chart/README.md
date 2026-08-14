@@ -94,7 +94,11 @@ kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheu
 
 ### Argo CD (recommended)
 
-This chart is designed for Argo CD. When `postgresql.operator.enabled=true`, ordering relies on `argocd.argoproj.io/sync-wave` annotations rather than Helm hooks (the CNPG operator subchart must come up before the `Cluster` CR can reconcile).
+This chart is designed for Argo CD. **Always set `argocd.enabled=true`** — install ordering then uses `argocd.argoproj.io/sync-wave` annotations instead of Helm hooks.
+
+> **This is mandatory, not cosmetic.** Argo CD maps `helm.sh/hook: pre-install` (and `pre-upgrade`) to a **PreSync hook** and deletes it before recreating it on every sync (`BeforeHookCreation` — which `helm.sh/resource-policy: keep` does *not* override). With Helm hooks under Argo CD, the three PVCs and the CNPG `Cluster` are deleted on every sync: the PVCs then hang in `Terminating` behind the `pvc-protection` finalizer — old pods still mount them, new pods can't schedule (`persistentvolumeclaim ... is being deleted`) — which deadlocks the rollout permanently, and the database CR is destroyed.
+>
+> `argocd.enabled` is deliberately independent from `postgresql.operator.enabled`: running Argo CD against a **cluster-wide** CNPG operator is a normal setup, and it previously fell back to Helm hooks.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -110,10 +114,14 @@ spec:
     targetRevision: "<see chart Chart.yaml>"
     helm:
       values: |
+        argocd:
+          enabled: true          # REQUIRED under Argo CD — see warning above
         app:
           django:
             secretKey: "<50-char random — set explicitly to avoid drift>"
         postgresql:
+          # true = deploy CNPG as a subchart; false = operator already cluster-wide.
+          # Either way, argocd.enabled above is what selects sync waves.
           operator:
             enabled: true
           password: "<32-char random>"
@@ -464,9 +472,9 @@ Kubernetes: `>=1.25.0-0`
 | Repository | Name | Version |
 |------------|------|---------|
 | https://cloudnative-pg.github.io/charts | cloudnative-pg | 0.29.* |
-| https://helm.elastic.co | eck-operator | 3.4.* |
+| https://helm.elastic.co | eck-operator | 3.5.* |
 | oci://registry-1.docker.io/cloudpirates | rabbitmq | 0.21.* |
-| oci://registry-1.docker.io/cloudpirates | redis | 0.32.* |
+| oci://registry-1.docker.io/cloudpirates | redis | 0.34.* |
 
 ## Values
 
@@ -476,6 +484,12 @@ Kubernetes: `>=1.25.0-0`
 |-----|------|---------|-------------|
 | global.imagePullSecrets | list | `[]` | Global Docker registry secret names as an array |
 | global.imageRegistry | string | `""` | Global Docker image registry |
+
+### Deployment tooling parameters
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| argocd.enabled | bool | `false` | Set to true when deploying with Argo CD. Install ordering then uses `argocd.argoproj.io/sync-wave` annotations instead of Helm hooks. This MUST be true under Argo CD: Argo maps `helm.sh/hook: pre-install` (and `pre-upgrade`) to a PreSync hook and deletes it before recreating it on every sync (`BeforeHookCreation`, which `helm.sh/resource-policy: keep` does not override). With Helm hooks under Argo, the PVCs and the CNPG `Cluster` are deleted on each sync — PVCs then hang in `Terminating` behind the `pvc-protection` finalizer and deadlock the rollout, and the database CR is destroyed. Sync waves are also implied when `postgresql.operator.enabled` is true. |
 
 ### Common parameters
 
@@ -1108,7 +1122,7 @@ External authentication backends. Mirrors the upstream documentation: https://in
 | elasticsearch.storage.size | string | `"30Gi"` | Storage size for Elasticsearch data |
 | elasticsearch.storage.storageClass | string | `""` | Storage class |
 | elasticsearch.tolerations | list | `[]` | Tolerations for Elasticsearch pods |
-| elasticsearch.version | string | `"8.19.18"` | Elasticsearch version |
+| elasticsearch.version | string | `"8.19.19"` | Elasticsearch version |
 
 ### Superuser parameters
 

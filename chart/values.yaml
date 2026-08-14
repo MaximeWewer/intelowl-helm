@@ -10,6 +10,21 @@ global:
   # -- Global Docker registry secret names as an array
   imagePullSecrets: []
 
+# @section Deployment tooling parameters
+
+argocd:
+  # -- Set to true when deploying with Argo CD. Install ordering then uses
+  # `argocd.argoproj.io/sync-wave` annotations instead of Helm hooks.
+  # This MUST be true under Argo CD: Argo maps `helm.sh/hook: pre-install`
+  # (and `pre-upgrade`) to a PreSync hook and deletes it before recreating
+  # it on every sync (`BeforeHookCreation`, which `helm.sh/resource-policy:
+  # keep` does not override). With Helm hooks under Argo, the PVCs and the
+  # CNPG `Cluster` are deleted on each sync — PVCs then hang in
+  # `Terminating` behind the `pvc-protection` finalizer and deadlock the
+  # rollout, and the database CR is destroyed.
+  # Sync waves are also implied when `postgresql.operator.enabled` is true.
+  enabled: false
+
 # @section Common parameters
 
 # -- String to partially override intelowl.fullname

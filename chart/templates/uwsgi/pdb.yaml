@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "intelowl.labels" . | nindent 4 }}
     app.kubernetes.io/component: uwsgi
-  {{- if .Values.postgresql.operator.enabled }}
+  {{- if include "intelowl.useSyncWaves" . }}
   annotations:
     argocd.argoproj.io/sync-wave: "3"
   {{- end }}

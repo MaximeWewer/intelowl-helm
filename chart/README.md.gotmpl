@@ -94,7 +94,11 @@ kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheu
 
 ### Argo CD (recommended)
 
-This chart is designed for Argo CD. When `postgresql.operator.enabled=true`, ordering relies on `argocd.argoproj.io/sync-wave` annotations rather than Helm hooks (the CNPG operator subchart must come up before the `Cluster` CR can reconcile).
+This chart is designed for Argo CD. **Always set `argocd.enabled=true`** — install ordering then uses `argocd.argoproj.io/sync-wave` annotations instead of Helm hooks.
+
+> **This is mandatory, not cosmetic.** Argo CD maps `helm.sh/hook: pre-install` (and `pre-upgrade`) to a **PreSync hook** and deletes it before recreating it on every sync (`BeforeHookCreation` — which `helm.sh/resource-policy: keep` does *not* override). With Helm hooks under Argo CD, the three PVCs and the CNPG `Cluster` are deleted on every sync: the PVCs then hang in `Terminating` behind the `pvc-protection` finalizer — old pods still mount them, new pods can't schedule (`persistentvolumeclaim ... is being deleted`) — which deadlocks the rollout permanently, and the database CR is destroyed.
+>
+> `argocd.enabled` is deliberately independent from `postgresql.operator.enabled`: running Argo CD against a **cluster-wide** CNPG operator is a normal setup, and it previously fell back to Helm hooks.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -110,10 +114,14 @@ spec:
     targetRevision: "<see chart Chart.yaml>"
     helm:
       values: |
+        argocd:
+          enabled: true          # REQUIRED under Argo CD — see warning above
         app:
           django:
             secretKey: "<50-char random — set explicitly to avoid drift>"
         postgresql:
+          # true = deploy CNPG as a subchart; false = operator already cluster-wide.
+          # Either way, argocd.enabled above is what selects sync waves.
           operator:
             enabled: true
           password: "<32-char random>"
@@ -467,6 +475,16 @@ kubectl exec -it deploy/intelowl-uwsgi -n intelowl -- python manage.py createsup
 |-----|------|---------|-------------|
 {{- range .Values }}
 {{- if hasPrefix "global." .Key }}
+| {{ .Key }} | {{ .Type }} | {{ if .Default }}{{ .Default }}{{ else }}{{ .AutoDefault }}{{ end }} | {{ if .Description }}{{ .Description }}{{ else }}{{ .AutoDescription }}{{ end }} |
+{{- end }}
+{{- end }}
+
+### Deployment tooling parameters
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+{{- range .Values }}
+{{- if hasPrefix "argocd." .Key }}
 | {{ .Key }} | {{ .Type }} | {{ if .Default }}{{ .Default }}{{ else }}{{ .AutoDefault }}{{ end }} | {{ if .Description }}{{ .Description }}{{ else }}{{ .AutoDescription }}{{ end }} |
 {{- end }}
 {{- end }}
