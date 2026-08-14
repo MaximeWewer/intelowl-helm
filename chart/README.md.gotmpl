@@ -721,6 +721,32 @@ External authentication backends. Mirrors the upstream documentation: https://in
 {{- end }}
 {{- end }}
 
+### Plugins parameters
+
+Configures the plugins in the Plugins tab (Analyzers, Connectors, Pivots, Visualizers, Ingestors): enable/disable them, pick their Celery queue and timeout, and set their parameters and API keys. API keys come from a Kubernetes Secret via `secretKeyRef`, so they never appear in the rendered manifests or in the Argo CD UI.
+
+This configures plugins that **already exist**; it cannot create one whose Python code is absent from the image, since every plugin points at a `PythonModule` backed by a class inside the container. See [`examples/with-plugins.yaml`](examples/with-plugins.yaml).
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+{{- range .Values }}
+{{- if hasPrefix "plugins." .Key }}
+| {{ .Key }} | {{ .Type }} | {{ if .Default }}{{ .Default }}{{ else }}{{ .AutoDefault }}{{ end }} | {{ if .Description }}{{ .Description }}{{ else }}{{ .AutoDescription }}{{ end }} |
+{{- end }}
+{{- end }}
+
+### Playbooks parameters
+
+Manages playbooks declaratively so they live in git instead of only in the database. The reconcile Job is idempotent and never deletes. See [`examples/with-playbooks.yaml`](examples/with-playbooks.yaml).
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+{{- range .Values }}
+{{- if hasPrefix "playbooks." .Key }}
+| {{ .Key }} | {{ .Type }} | {{ if .Default }}{{ .Default }}{{ else }}{{ .AutoDefault }}{{ end }} | {{ if .Description }}{{ .Description }}{{ else }}{{ .AutoDescription }}{{ end }} |
+{{- end }}
+{{- end }}
+
 ### Celery Restart parameters
 
 | Key | Type | Default | Description |
@@ -786,6 +812,8 @@ Example value files are provided in the `examples/` directory:
 | `with-elasticsearch.yaml`| Elasticsearch + Kibana for results indexing      |
 | `with-auth.yaml`         | External authentication: Google OAuth2 / LDAP / RADIUS |
 | `with-monitoring.yaml`   | Prometheus metrics for every component           |
+| `with-playbooks.yaml`    | Playbooks managed declaratively (GitOps)         |
+| `with-plugins.yaml`      | Plugin settings and API keys from a Secret       |
 | `minikube-overrides.yaml`| Minikube-specific overrides (RWO storageClass)   |
 
 ## Testing

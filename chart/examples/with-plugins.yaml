@@ -1,0 +1,117 @@
+# IntelOwl with declaratively configured plugins
+#
+# Configures the plugins shown in the Plugins tab (Analyzers, Connectors,
+# Pivots, Visualizers, Ingestors): which ones are enabled, which Celery queue
+# they run on, and their parameters and API keys.
+#
+# SCOPE: this configures plugins that ALREADY exist. It cannot create a plugin
+# whose Python code is not in the image — every plugin points at a
+# `PythonModule` row backed by a class inside the container. To add a brand new
+# analyzer you need a custom image; to get a variant of an existing one,
+# duplicate it in the UI (upstream does this itself: GreyNoiseAnalyzer backs
+# both `GreyNoise` and `GreyNoiseCommunity`).
+#
+# The reconcile Job is idempotent, runs on every sync/upgrade, and never
+# deletes: dropping an entry leaves the plugin as-is in the database.
+#
+# A parameter value is written in one of three ways:
+#
+#   value         non-sensitive. Stored in a ConfigMap, readable by anyone
+#                 with read access to the namespace.
+#   secretValue   sensitive, written inline in this file. The chart puts it
+#                 in a generated Secret — never in the ConfigMap — and
+#                 injects it into the Job as an env var. Simplest option,
+#                 but the value lives in your values file, so keep that file
+#                 private or encrypt it (SOPS, sealed-secrets, ...).
+#   secretKeyRef  sensitive, read from a Secret you manage yourself. Nothing
+#                 sensitive enters the chart values at all.
+#
+# In every case the value is passed to the Job through an environment
+# variable, so it never appears in the ConfigMap, in `helm template` output,
+# or in the Argo CD UI.
+#
+# For the `secretKeyRef` example below, create the Secret first:
+#   kubectl create secret generic intelowl-plugin-secrets -n intelowl \
+#     --from-literal=yeti-api-key='<key>'
+#
+# Install:
+#   cd chart
+#   helm install intelowl . -f examples/with-plugins.yaml -n intelowl --create-namespace
+
+plugins:
+  enabled: true
+
+  # "" -> global values applied to every user (recommended for GitOps).
+  # A username -> values scoped to that account, which must already exist.
+  owner: ""
+
+  # Fail the Job on an unknown plugin/parameter instead of warning. Handy in
+  # CI; riskier on upgrades, where upstream may rename a plugin.
+  strict: false
+
+  # ---------------------------------------------------------------
+  # Basic per-plugin settings
+  # ---------------------------------------------------------------
+  # WARNING on `routing_key`: it must name a queue that actually has a worker
+  # consuming it, otherwise the analyzer is queued and never runs. With
+  # `multiQueue.enabled: false` the only queue is `default`. Enabling
+  # multiQueue adds `local`, `long` and `ingestor` depending on which workers
+  # you turn on. Check with:
+  #   kubectl get deploy -n intelowl | grep celery-worker
+  settings:
+    # Heavy static analysis: give it more time and a dedicated queue.
+    # Requires multiQueue.workerLong.enabled — Yara ships on `local`.
+    - name: Yara
+      type: analyzer
+      disabled: false
+      routing_key: long
+      soft_time_limit: 500
+
+    # Turn off analyzers you have no key for, so they stop reporting failures.
+    - name: VirusTotal_v3_Get_Observable
+      type: analyzer
+      disabled: true
+
+    # Restrict a plugin that talks to a third party to non-sensitive data.
+    - name: AbuseIPDB
+      type: analyzer
+      maximum_tlp: AMBER
+
+  # ---------------------------------------------------------------
+  # Parameters and API keys
+  # ---------------------------------------------------------------
+  # Find the parameter names of a plugin with:
+  #   kubectl exec -n intelowl deploy/<release>-uwsgi -c uwsgi -- \
+  #     python3 manage.py shell -c "
+  #   from api_app.analyzers_manager.models import AnalyzerConfig
+  #   from api_app.models import Parameter
+  #   a = AnalyzerConfig.objects.get(name='MISP')
+  #   print([(p.name, p.is_secret) for p in Parameter.objects.filter(python_module=a.python_module)])"
+  configs:
+    # NOTE: IntelOwl flags `url_key_name` as a secret, so it is masked in the
+    # UI and in this Job's logs. Keeping the URL as a plain `value` is fine —
+    # an endpoint is not a credential — but use `secretKeyRef` below if your
+    # instance URL is itself sensitive.
+    - name: MISP
+      type: analyzer
+      parameter: url_key_name
+      value: "https://misp.example.com"
+
+    # Sensitive value written inline: the chart stores it in a generated
+    # Secret, not in the ConfigMap. Keep this file private or encrypt it.
+    - name: MISP
+      type: analyzer
+      parameter: api_key_name
+      secretValue: "replace-me-with-your-misp-api-key"
+
+    - name: YETI
+      type: analyzer
+      parameter: url_key_name
+      value: "https://yeti.example.com/api/v2"
+
+    - name: YETI
+      type: analyzer
+      parameter: api_key_name
+      secretKeyRef:
+        name: intelowl-plugin-secrets
+        key: yeti-api-key

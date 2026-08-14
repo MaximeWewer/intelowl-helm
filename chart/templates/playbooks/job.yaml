@@ -1,0 +1,68 @@
+{{- if and .Values.playbooks.enabled .Values.playbooks.definitions }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "intelowl.fullname" . }}-playbooks
+  labels:
+    {{- include "intelowl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: playbooks
+  annotations:
+    {{- if include "intelowl.useSyncWaves" . }}
+    {{- /* After migrations (analyzers must exist) and after the superuser
+           job, so `playbooks.owner` can reference the created account. */}}
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    {{- else }}
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    {{- end }}
+    checksum/playbooks: {{ toJson .Values.playbooks.definitions | sha256sum }}
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        {{- include "intelowl.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: playbooks
+    spec:
+      {{- include "intelowl.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "intelowl.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: Never
+      initContainers:
+        {{- include "intelowl.waitForDbInitContainer" . | nindent 8 }}
+      containers:
+        - name: playbooks
+          image: {{ include "intelowl.image" (dict "imageRoot" .Values.uwsgi.image "Chart" .Chart "Values" .Values) }}
+          imagePullPolicy: {{ .Values.uwsgi.image.pullPolicy }}
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          workingDir: /opt/deploy/intel_owl
+          command:
+            - python3
+            - /config/reconcile.py
+          env:
+            {{- include "intelowl.migrationEnvVars" . | nindent 12 }}
+            - name: PLAYBOOKS_OWNER
+              value: {{ .Values.playbooks.owner | quote }}
+            - name: PLAYBOOKS_STRICT
+              value: {{ .Values.playbooks.strict | ternary "True" "False" | quote }}
+          volumeMounts:
+            - name: playbooks-config
+              mountPath: /config
+              readOnly: true
+          resources:
+            {{- toYaml .Values.playbooks.resources | nindent 12 }}
+      volumes:
+        - name: playbooks-config
+          configMap:
+            name: {{ include "intelowl.fullname" . }}-playbooks
+{{- end }}

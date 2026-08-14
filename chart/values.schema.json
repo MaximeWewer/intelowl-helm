@@ -2457,6 +2457,240 @@
                 }
             }
         },
+        "playbooks": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "strict": {
+                    "type": "boolean"
+                },
+                "resources": {
+                    "type": "object"
+                },
+                "definitions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "name",
+                            "description",
+                            "type",
+                            "tlp"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "type": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "enum": [
+                                        "ip",
+                                        "url",
+                                        "domain",
+                                        "hash",
+                                        "generic",
+                                        "file"
+                                    ]
+                                }
+                            },
+                            "tlp": {
+                                "type": "string",
+                                "enum": [
+                                    "CLEAR",
+                                    "GREEN",
+                                    "AMBER",
+                                    "RED"
+                                ]
+                            },
+                            "analyzers": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "connectors": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "pivots": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "disabled": {
+                                "type": "boolean"
+                            },
+                            "starting": {
+                                "type": "boolean"
+                            },
+                            "for_organization": {
+                                "type": "boolean"
+                            },
+                            "scan_mode": {
+                                "type": "integer",
+                                "enum": [
+                                    1,
+                                    2
+                                ]
+                            },
+                            "runtime_configuration": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "plugins": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "strict": {
+                    "type": "boolean"
+                },
+                "resources": {
+                    "type": "object"
+                },
+                "settings": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "name",
+                            "type"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            "type": {
+                                "type": "string",
+                                "enum": [
+                                    "analyzer",
+                                    "connector",
+                                    "pivot",
+                                    "visualizer",
+                                    "ingestor"
+                                ]
+                            },
+                            "disabled": {
+                                "type": "boolean"
+                            },
+                            "soft_time_limit": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "routing_key": {
+                                "type": "string"
+                            },
+                            "maximum_tlp": {
+                                "type": "string",
+                                "enum": [
+                                    "CLEAR",
+                                    "GREEN",
+                                    "AMBER",
+                                    "RED"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "configs": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "name",
+                            "type",
+                            "parameter"
+                        ],
+                        "oneOf": [
+                            {
+                                "required": [
+                                    "value"
+                                ]
+                            },
+                            {
+                                "required": [
+                                    "secretValue"
+                                ]
+                            },
+                            {
+                                "required": [
+                                    "secretKeyRef"
+                                ]
+                            }
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            "type": {
+                                "type": "string",
+                                "enum": [
+                                    "analyzer",
+                                    "connector",
+                                    "pivot",
+                                    "visualizer",
+                                    "ingestor"
+                                ]
+                            },
+                            "parameter": {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            "value": {},
+                            "for_organization": {
+                                "type": "boolean"
+                            },
+                            "secretKeyRef": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "key"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "key": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "secretValue": {
+                                "type": [
+                                    "string",
+                                    "number",
+                                    "boolean"
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "podSecurityContext": {
             "type": "object",
             "properties": {

@@ -1,0 +1,246 @@
+# IntelOwl with declaratively managed playbooks (GitOps)
+#
+# The chart ships a reconcile Job that creates/updates the playbooks listed
+# below after migrations. Playbooks then live in git instead of only in the
+# database, so they survive a namespace rebuild and are reviewable in PRs.
+#
+# The Job is idempotent and runs on every sync/upgrade. It never deletes:
+# dropping an entry here leaves the playbook untouched in the database.
+#
+# WARNING: a playbook listed here is reconciled on every run, so UI edits to
+# it are overwritten. Playbooks absent from this list are never touched.
+#
+# Export the playbooks you already built in the UI with:
+#   kubectl exec -n intelowl deploy/<release>-uwsgi -c uwsgi -- \
+#     python3 manage.py shell -c "
+#   import json
+#   from api_app.playbooks_manager.models import PlaybookConfig
+#   print(json.dumps([{
+#       'name': p.name, 'description': p.description, 'type': list(p.type),
+#       'tlp': p.tlp, 'analyzers': sorted(a.name for a in p.analyzers.all()),
+#       'pivots': sorted(v.name for v in p.pivots.all()),
+#   } for p in PlaybookConfig.objects.filter(owner__isnull=False)], indent=2))"
+#
+# Install:
+#   cd chart
+#   helm install intelowl . -f examples/with-playbooks.yaml -n intelowl --create-namespace
+
+playbooks:
+  enabled: true
+
+  # Who owns the playbooks.
+  #
+  #   ""       -> no owner: the playbook is GLOBAL and visible to every user.
+  #               Recommended for GitOps: it does not depend on an account
+  #               existing, and survives deleting the user who created it.
+  #
+  #   "admin"  -> owned by that user, like a playbook built in the UI.
+  #               The account must already exist (see superuser.username),
+  #               which is why the reconcile Job runs after the superuser Job.
+  #
+  # NOTE: this field is reconciled like the others. Pointing an existing,
+  # UI-created playbook at a different owner will change its visibility.
+  # If you exported playbooks that currently belong to `admin` and want to
+  # keep them that way, set `owner: "admin"` here.
+  owner: ""
+
+  # Fail the Job when a referenced analyzer/pivot does not exist, instead of
+  # skipping it with a warning. Useful in CI, riskier on upgrades where
+  # upstream may rename a plugin.
+  strict: false
+  definitions:
+  - name: CTI_Analyze_File
+    description: Static file analysis via free tools (no external upload).
+    type:
+    - file
+    tlp: CLEAR
+    analyzers:
+    - APK_Artifacts
+    - Androguard
+    - Blint
+    - Capa_Info
+    - Capa_Info_Shellcode
+    - Cymru_Hash_Registry_Get_File
+    - Debloat
+    - DetectItEasy
+    - Doc_Info
+    - ELF_Info
+    - File_Info
+    - GoReSym
+    - HashLookupServer_Get_File
+    - Hfinger
+    - IocExtract
+    - IocFinder
+    - Lnk_Info
+    - MachoInfo
+    - OneNote_Info
+    - PDF_Info
+    - PE_Info
+    - Permhash
+    - Phishing_Form_Compiler
+    - Rtf_Info
+    - Signature_Info
+    - SpeakEasy
+    - SpeakEasy_Shellcode
+    - Xlm_Macro_Deobfuscator
+    - Yara
+    - YaraX
+    - Zippy_scan
+  - name: CTI_Enrich_Domain
+    description: Enrich domain via MISP + YETI + free OSINT DNS/phishing/cert.
+    type:
+    - domain
+    - hash
+    - generic
+    - ip
+    - url
+    tlp: CLEAR
+    analyzers:
+    - AILTypoSquatting
+    - AdGuard
+    - CheckDMARC
+    - Classic_DNS
+    - CleanBrowsing_Malicious_Detector
+    - CloudFlare_DNS
+    - CloudFlare_Malicious_Detector
+    - Crt_sh
+    - DNS4EU
+    - DNS4EU_Malicious_Detector
+    - Google_DNS
+    - MISP
+    - Mnemonic_PassiveDNS
+    - Mullvad_DNS
+    - PhishingArmy
+    - Phishstats
+    - Phishtank
+    - Quad9_DNS
+    - Quad9_Malicious_Detector
+    - Rdap
+    - Robtex
+    - Threatminer
+    - Tranco
+    - TweetFeed
+    - YETI
+    pivots:
+    - CTI_Pivot_ResolvedIP_to_Enrich
+  - name: CTI_Enrich_Generic
+    description: Enrich generic IOC (email/cve/etc) via MISP + YETI + free OSINT.
+    type:
+    - domain
+    - hash
+    - generic
+    - ip
+    - url
+    tlp: GREEN
+    analyzers:
+    - CRXcavator
+    - CVE_Exploitability
+    - CyCat
+    - HibpPasswords
+    - JA4_DB
+    - MISP
+    - NVD_CVE
+    - OrklSearch
+    - Phishstats
+    - Spamhaus_DROP
+    - YETI
+  - name: CTI_Enrich_Hash
+    description: Enrich file hash via MISP + YETI + free OSINT hash reputation.
+    type:
+    - generic
+    - url
+    - domain
+    - ip
+    - hash
+    tlp: AMBER
+    analyzers:
+    - Cymru_Hash_Registry_Get_Observable
+    - HashLookupServer_Get_Observable
+    - MISP
+    - OrklSearch
+    - Threatminer
+    - TweetFeed
+    - YETI
+  - name: CTI_Enrich_IP
+    description: Enrich IP via MISP + YETI + free OSINT reputation/DNS/passive-DNS.
+    type:
+    - generic
+    - url
+    - domain
+    - ip
+    - hash
+    tlp: GREEN
+    analyzers:
+    - Abusix
+    - BGP_Ranking
+    - Classic_DNS
+    - DShield
+    - FireHol_IPList
+    - GreyNoiseCommunity
+    - IPApi
+    - IPQuery
+    - MISP
+    - Mmdb_server
+    - Mnemonic_PassiveDNS
+    - Phishstats
+    - Rdap
+    - Robtex
+    - Spamhaus_DROP
+    - Stratosphere_Blacklist
+    - TalosReputation
+    - Threatminer
+    - TorProject
+    - Tor_Nodes_DanMeUk
+    - TweetFeed
+    - WhoIs_RipeDB_Search
+    - YETI
+  - name: CTI_Enrich_IP_Fast
+    description: 'Triage rapide IP (flux Wazuh): MISP + YETI + GreyNoise + blocklists. ~6 analyzers.'
+    type:
+    - generic
+    - url
+    - domain
+    - ip
+    - hash
+    tlp: AMBER
+    analyzers:
+    - FireHol_IPList
+    - GreyNoiseCommunity
+    - MISP
+    - Spamhaus_DROP
+    - TalosReputation
+    - YETI
+  - name: CTI_Enrich_URL
+    description: Enrich URL via MISP + YETI + free OSINT phishing/reputation.
+    type:
+    - generic
+    - url
+    - domain
+    - ip
+    - hash
+    tlp: CLEAR
+    analyzers:
+    - AdGuard
+    - Classic_DNS
+    - CleanBrowsing_Malicious_Detector
+    - CloudFlare_DNS
+    - CloudFlare_Malicious_Detector
+    - DNS4EU
+    - DNS4EU_Malicious_Detector
+    - ExpandURL
+    - Google_DNS
+    - MISP
+    - Mullvad_DNS
+    - PhishingArmy
+    - Phishstats
+    - Phishtank
+    - Quad9_DNS
+    - Quad9_Malicious_Detector
+    - Rdap
+    - Robtex
+    - Tranco
+    - TweetFeed
+    - WAD
+    - YETI
+    pivots:
+    - CTI_Pivot_ResolvedIP_to_Enrich

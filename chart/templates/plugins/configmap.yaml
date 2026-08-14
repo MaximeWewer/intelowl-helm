@@ -1,0 +1,165 @@
+{{- if and .Values.plugins.enabled (or .Values.plugins.settings .Values.plugins.configs) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "intelowl.fullname" . }}-plugins
+  labels:
+    {{- include "intelowl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: plugins
+  {{- if include "intelowl.useSyncWaves" . }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  {{- end }}
+data:
+  {{- /* Sensitive values never land here: entries using `secretValue` or
+         `secretKeyRef` only carry the name of the env var the Job reads. */}}
+  settings.json: |-
+    {{- toJson (.Values.plugins.settings | default list) | nindent 4 }}
+
+  configs.json: |-
+    {{- $entries := list }}
+    {{- range $index, $config := (.Values.plugins.configs | default list) }}
+      {{- $entry := omit $config "secretKeyRef" "secretValue" }}
+      {{- if or $config.secretKeyRef (hasKey $config "secretValue") }}
+        {{- $entry = merge (dict "secretEnv" (printf "PLUGIN_SECRET_%d" $index)) $entry }}
+      {{- end }}
+      {{- $entries = append $entries $entry }}
+    {{- end }}
+    {{- toJson $entries | nindent 4 }}
+
+  reconcile.py: |-
+    """Reconcile IntelOwl plugin settings and parameter values.
+
+    Idempotent: existing plugins are updated in place, nothing is deleted.
+    Cannot create a plugin whose Python code is absent from the image.
+    """
+    import json
+    import os
+    import sys
+
+    import django
+
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "intel_owl.settings")
+    django.setup()
+
+    from django.contrib.auth import get_user_model
+
+    from api_app.analyzers_manager.models import AnalyzerConfig
+    from api_app.connectors_manager.models import ConnectorConfig
+    from api_app.ingestors_manager.models import IngestorConfig
+    from api_app.models import Parameter, PluginConfig
+    from api_app.pivots_manager.models import PivotConfig
+    from api_app.visualizers_manager.models import VisualizerConfig
+
+    STRICT = os.environ.get("PLUGINS_STRICT", "False") == "True"
+    OWNER_NAME = os.environ.get("PLUGINS_OWNER", "").strip()
+
+    # plugin type -> (config model, PluginConfig foreign key holding it)
+    PLUGIN_TYPES = {
+        "analyzer": (AnalyzerConfig, "analyzer_config"),
+        "connector": (ConnectorConfig, "connector_config"),
+        "pivot": (PivotConfig, "pivot_config"),
+        "visualizer": (VisualizerConfig, "visualizer_config"),
+        "ingestor": (IngestorConfig, "ingestor_config"),
+    }
+    # Settings applied verbatim when present and supported by the model.
+    SETTING_FIELDS = ("disabled", "soft_time_limit", "routing_key", "maximum_tlp")
+
+    problems = []
+
+    def load(path):
+        try:
+            with open(path) as handle:
+                return json.load(handle)
+        except FileNotFoundError:
+            return []
+
+    def get_plugin(entry):
+        """Resolve one declaration to its config object, or None."""
+        kind = entry["type"]
+        if kind not in PLUGIN_TYPES:
+            problems.append("%r: unknown plugin type %r" % (entry.get("name"), kind))
+            return None, None
+        model, fk_name = PLUGIN_TYPES[kind]
+        plugin = model.objects.filter(name=entry["name"]).first()
+        if plugin is None:
+            problems.append("unknown %s: %r" % (kind, entry["name"]))
+        return plugin, fk_name
+
+    owner = None
+    if OWNER_NAME:
+        owner = get_user_model().objects.filter(username=OWNER_NAME).first()
+        if owner is None:
+            print("ERROR: owner user %r does not exist" % OWNER_NAME)
+            sys.exit(1)
+
+    # --- settings -----------------------------------------------------------
+    settings_applied = 0
+    for entry in load("/config/settings.json"):
+        plugin, _ = get_plugin(entry)
+        if plugin is None:
+            continue
+        changed = []
+        for field in SETTING_FIELDS:
+            if field not in entry:
+                continue
+            if not hasattr(plugin, field):
+                problems.append("%r: %s does not support %r" % (entry["name"], entry["type"], field))
+                continue
+            if getattr(plugin, field) != entry[field]:
+                setattr(plugin, field, entry[field])
+                changed.append(field)
+        if changed:
+            plugin.save(update_fields=changed)
+            settings_applied += 1
+            print("updated %s %r: %s" % (entry["type"], entry["name"], ", ".join(changed)))
+        else:
+            print("unchanged %s %r" % (entry["type"], entry["name"]))
+
+    # --- parameter values ---------------------------------------------------
+    configs_applied = 0
+    for entry in load("/config/configs.json"):
+        plugin, fk_name = get_plugin(entry)
+        if plugin is None:
+            continue
+
+        if "secretEnv" in entry:
+            value = os.environ.get(entry["secretEnv"])
+            if value is None:
+                problems.append(
+                    "%r/%s: secret env %s is not set" % (entry["name"], entry["parameter"], entry["secretEnv"])
+                )
+                continue
+        else:
+            value = entry.get("value")
+
+        parameter = Parameter.objects.filter(
+            name=entry["parameter"], python_module=plugin.python_module
+        ).first()
+        if parameter is None:
+            problems.append("%r: unknown parameter %r" % (entry["name"], entry["parameter"]))
+            continue
+
+        _, created = PluginConfig.objects.update_or_create(
+            parameter=parameter,
+            owner=owner,
+            for_organization=entry.get("for_organization", False),
+            **{fk_name: plugin},
+            defaults={"value": value},
+        )
+        configs_applied += 1
+        shown = "***" if parameter.is_secret else repr(value)
+        print("%s %s %r parameter %r = %s" % (
+            "set" if created else "updated", entry["type"], entry["name"], parameter.name, shown
+        ))
+
+    print("done: %d setting(s), %d parameter value(s)" % (settings_applied, configs_applied))
+
+    if problems:
+        print("\n%d warning(s):" % len(problems))
+        for problem in problems:
+            print("  - %s" % problem)
+        if STRICT:
+            print("failing because plugins.strict is true")
+            sys.exit(1)
+{{- end }}

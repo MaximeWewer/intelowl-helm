@@ -1,0 +1,90 @@
+{{- if and .Values.plugins.enabled (or .Values.plugins.settings .Values.plugins.configs) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "intelowl.fullname" . }}-plugins
+  labels:
+    {{- include "intelowl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: plugins
+  annotations:
+    {{- if include "intelowl.useSyncWaves" . }}
+    {{- /* After migrations (plugins must exist) and the superuser job, so
+           `plugins.owner` can reference the created account. */}}
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    {{- else }}
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    {{- end }}
+    {{- /* Sensitive values are stripped before hashing: the Job is recreated
+           on every run anyway, and hashing them would publish a fingerprint
+           of the secret in an annotation. */}}
+    {{- $sanitized := list }}
+    {{- range (.Values.plugins.configs | default list) }}
+    {{- $sanitized = append $sanitized (omit . "secretValue" "secretKeyRef") }}
+    {{- end }}
+    checksum/plugins: {{ printf "%s%s" (toJson (.Values.plugins.settings | default list)) (toJson $sanitized) | sha256sum }}
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        {{- include "intelowl.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: plugins
+    spec:
+      {{- include "intelowl.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "intelowl.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: Never
+      initContainers:
+        {{- include "intelowl.waitForDbInitContainer" . | nindent 8 }}
+      containers:
+        - name: plugins
+          image: {{ include "intelowl.image" (dict "imageRoot" .Values.uwsgi.image "Chart" .Chart "Values" .Values) }}
+          imagePullPolicy: {{ .Values.uwsgi.image.pullPolicy }}
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          workingDir: /opt/deploy/intel_owl
+          command:
+            - python3
+            - /config/reconcile.py
+          env:
+            {{- include "intelowl.migrationEnvVars" . | nindent 12 }}
+            - name: PLUGINS_OWNER
+              value: {{ .Values.plugins.owner | quote }}
+            - name: PLUGINS_STRICT
+              value: {{ .Values.plugins.strict | ternary "True" "False" | quote }}
+            {{- range $index, $config := (.Values.plugins.configs | default list) }}
+            {{- if $config.secretKeyRef }}
+            - name: {{ printf "PLUGIN_SECRET_%d" $index }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "plugins.configs[].secretKeyRef.name is required" $config.secretKeyRef.name }}
+                  key: {{ required "plugins.configs[].secretKeyRef.key is required" $config.secretKeyRef.key }}
+            {{- else if hasKey $config "secretValue" }}
+            - name: {{ printf "PLUGIN_SECRET_%d" $index }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "intelowl.fullname" $ }}-plugin-values
+                  key: {{ printf "plugin-secret-%d" $index }}
+            {{- end }}
+            {{- end }}
+          volumeMounts:
+            - name: plugins-config
+              mountPath: /config
+              readOnly: true
+          resources:
+            {{- toYaml .Values.plugins.resources | nindent 12 }}
+      volumes:
+        - name: plugins-config
+          configMap:
+            name: {{ include "intelowl.fullname" . }}-plugins
+{{- end }}

@@ -1134,6 +1134,39 @@ External authentication backends. Mirrors the upstream documentation: https://in
 | superuser.password | string | `""` | Superuser password (auto-generated if empty) |
 | superuser.username | string | `"admin"` | Superuser username |
 
+### Plugins parameters
+
+Configures the plugins in the Plugins tab (Analyzers, Connectors, Pivots, Visualizers, Ingestors): enable/disable them, pick their Celery queue and timeout, and set their parameters and API keys. API keys come from a Kubernetes Secret via `secretKeyRef`, so they never appear in the rendered manifests or in the Argo CD UI.
+
+This configures plugins that **already exist**; it cannot create one whose Python code is absent from the image, since every plugin points at a `PythonModule` backed by a class inside the container. See [`examples/with-plugins.yaml`](examples/with-plugins.yaml).
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| plugins.configs | list | `[]` | Plugin parameters and API keys. Required per entry: `name`, `type`, `parameter`, and exactly one of:    value         non-sensitive literal. Stored in a ConfigMap, so it is                 readable by anyone with read access to the namespace and                 visible in `helm template` and in the Argo CD UI.    secretValue   sensitive literal written inline here. The chart puts it                 in a generated Secret (never in the ConfigMap) and injects                 it into the Job as an environment variable. Convenient,                 but the value still sits in your values file — keep that                 file private, or encrypt it (SOPS, sealed-secrets, ...).    secretKeyRef  sensitive value read from a Secret you manage yourself.                 Nothing sensitive ever enters the chart values.                 Best option when you already have a secrets workflow. |
+| plugins.enabled | bool | `false` | Enable declarative plugin configuration |
+| plugins.owner | string | `""` | Username owning the created parameter values. Empty means a global value applied to every user (recommended). If set, the user must exist. |
+| plugins.resources.limits.cpu | string | `"500m"` |  |
+| plugins.resources.limits.memory | string | `"512Mi"` |  |
+| plugins.resources.requests.cpu | string | `"100m"` |  |
+| plugins.resources.requests.memory | string | `"256Mi"` |  |
+| plugins.settings | list | `[]` | Basic per-plugin settings. Required per entry: `name` and `type` (analyzer, connector, pivot, visualizer or ingestor). Optional: disabled, soft_time_limit, routing_key, maximum_tlp. |
+| plugins.strict | bool | `false` | Fail the Job on an unknown plugin or parameter instead of warning. |
+
+### Playbooks parameters
+
+Manages playbooks declaratively so they live in git instead of only in the database. The reconcile Job is idempotent and never deletes. See [`examples/with-playbooks.yaml`](examples/with-playbooks.yaml).
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| playbooks.definitions | list | `[]` | Playbook definitions. Required per entry: `name`, `description`, `type`, `tlp`. `type`: ip, url, domain, hash, generic, file `tlp` : CLEAR, GREEN, AMBER, RED Optional: analyzers, connectors, pivots (lists of plugin names), disabled, starting, scan_mode (1=force new, 2=check previous), runtime_configuration. See examples/with-playbooks.yaml for a complete set. |
+| playbooks.enabled | bool | `false` | Enable declarative playbook management |
+| playbooks.owner | string | `""` | Username owning the created playbooks. Empty means no owner, i.e. a global playbook visible to every user (recommended for GitOps). If set, the user must already exist — see `superuser.username`. |
+| playbooks.resources.limits.cpu | string | `"500m"` |  |
+| playbooks.resources.limits.memory | string | `"512Mi"` |  |
+| playbooks.resources.requests.cpu | string | `"100m"` |  |
+| playbooks.resources.requests.memory | string | `"256Mi"` |  |
+| playbooks.strict | bool | `false` | Fail the Job when a referenced analyzer/connector/pivot does not exist. When false (default) unknown plugins are skipped with a warning, so an upstream rename cannot block a deployment. |
+
 ### Celery Restart parameters
 
 | Key | Type | Default | Description |
@@ -1250,6 +1283,8 @@ Example value files are provided in the `examples/` directory:
 | `with-elasticsearch.yaml`| Elasticsearch + Kibana for results indexing      |
 | `with-auth.yaml`         | External authentication: Google OAuth2 / LDAP / RADIUS |
 | `with-monitoring.yaml`   | Prometheus metrics for every component           |
+| `with-playbooks.yaml`    | Playbooks managed declaratively (GitOps)         |
+| `with-plugins.yaml`      | Plugin settings and API keys from a Secret       |
 | `minikube-overrides.yaml`| Minikube-specific overrides (RWO storageClass)   |
 
 ## Testing

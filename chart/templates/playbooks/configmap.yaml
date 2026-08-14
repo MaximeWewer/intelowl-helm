@@ -1,0 +1,113 @@
+{{- if and .Values.playbooks.enabled .Values.playbooks.definitions }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "intelowl.fullname" . }}-playbooks
+  labels:
+    {{- include "intelowl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: playbooks
+  {{- if include "intelowl.useSyncWaves" . }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  {{- end }}
+data:
+  playbooks.json: |-
+    {{- toJson .Values.playbooks.definitions | nindent 4 }}
+
+  reconcile.py: |-
+    """Reconcile IntelOwl playbooks from a declarative definition file.
+
+    Idempotent: playbooks are matched on `name`, created when missing and
+    updated in place otherwise. Nothing is ever deleted.
+    """
+    import json
+    import os
+    import sys
+
+    import django
+
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "intel_owl.settings")
+    django.setup()
+
+    from django.contrib.auth import get_user_model
+
+    from api_app.analyzers_manager.models import AnalyzerConfig
+    from api_app.connectors_manager.models import ConnectorConfig
+    from api_app.pivots_manager.models import PivotConfig
+    from api_app.playbooks_manager.models import PlaybookConfig
+
+    STRICT = os.environ.get("PLAYBOOKS_STRICT", "False") == "True"
+    OWNER_NAME = os.environ.get("PLAYBOOKS_OWNER", "").strip()
+
+    # Fields copied verbatim when present in a definition.
+    SCALAR_FIELDS = (
+        "description",
+        "type",
+        "tlp",
+        "disabled",
+        "starting",
+        "scan_mode",
+        "runtime_configuration",
+        "for_organization",
+    )
+    RELATIONS = (
+        ("analyzers", AnalyzerConfig),
+        ("connectors", ConnectorConfig),
+        ("pivots", PivotConfig),
+    )
+
+    problems = []
+
+    def resolve(model, names, playbook_name, relation):
+        """Map plugin names to config objects, reporting the unknown ones."""
+        found = list(model.objects.filter(name__in=names))
+        missing = sorted(set(names) - {obj.name for obj in found})
+        if missing:
+            problems.append(
+                "playbook %r: unknown %s: %s" % (playbook_name, relation, ", ".join(missing))
+            )
+        return found
+
+    with open("/config/playbooks.json") as handle:
+        definitions = json.load(handle)
+
+    owner = None
+    if OWNER_NAME:
+        owner = get_user_model().objects.filter(username=OWNER_NAME).first()
+        if owner is None:
+            print("ERROR: owner user %r does not exist" % OWNER_NAME)
+            sys.exit(1)
+
+    created_count = updated_count = 0
+
+    for definition in definitions:
+        name = definition["name"]
+        fields = {key: definition[key] for key in SCALAR_FIELDS if key in definition}
+        fields["owner"] = owner
+
+        playbook, created = PlaybookConfig.objects.update_or_create(
+            name=name, defaults=fields
+        )
+
+        for relation, model in RELATIONS:
+            if relation in definition:
+                getattr(playbook, relation).set(
+                    resolve(model, definition[relation], name, relation)
+                )
+
+        created_count += created
+        updated_count += not created
+        print("%s playbook %r (%d analyzers)" % (
+            "created" if created else "updated", name, playbook.analyzers.count()
+        ))
+
+    print("done: %d created, %d updated" % (created_count, updated_count))
+
+    if problems:
+        print("\n%d warning(s):" % len(problems))
+        for problem in problems:
+            print("  - %s" % problem)
+        if STRICT:
+            print("failing because playbooks.strict is true")
+            sys.exit(1)
+{{- end }}
