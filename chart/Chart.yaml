@@ -2,7 +2,7 @@ apiVersion: v2
 name: intelowl
 description: A Helm chart for deploying IntelOwl - Open Source Intelligence Platform
 type: application
-version: 6.7.0-10-08-2026
+version: 6.7.0-17-08-2026
 appVersion: "v6.7.0"
 
 keywords:
