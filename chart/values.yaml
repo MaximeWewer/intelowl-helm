@@ -1442,6 +1442,20 @@ metrics:
       - "local"
       - "long"
       - "ingestor"
+    # -- Broker transport options passed to celery-exporter, as `key=value`.
+    # MUST stay aligned with IntelOwl's own `broker_transport_options`
+    # (intel_owl/settings/celery.py), because both clients share the broker.
+    #
+    # `sep=:` is REQUIRED with Redis. IntelOwl overrides kombu's default
+    # binding separator (`\x06\x16`) with `:`. An exporter left on the default
+    # writes `_kombu.binding.celeryev` and `_kombu.binding.reply.celery.pidbox`
+    # in the other format; the workers then fail to parse them
+    # (`ValueError: not enough values to unpack (expected 3, got 1)`) while
+    # publishing their `worker-online` event. They die before starting their
+    # consumers, so they never become ready, consume nothing, and are killed by
+    # the liveness probe every few minutes.
+    brokerTransportOptions:
+      - "sep=:"
     # -- Extra CLI args for celery-exporter
     extraArgs: []
     resources:

@@ -44,6 +44,12 @@ spec:
             - --broker-url=$(BROKER_URL)
             - --host=0.0.0.0
             - --port={{ .Values.metrics.celery.port }}
+            {{- /* Must match IntelOwl's broker_transport_options: both clients
+                   share the broker, and a mismatched binding separator makes
+                   the workers fail to parse the routing tables. */}}
+            {{- range .Values.metrics.celery.brokerTransportOptions }}
+            - "--broker-transport-option={{ . }}"
+            {{- end }}
             {{- with .Values.metrics.celery.queues }}
             - --queues={{ join "," . }}
             {{- end }}

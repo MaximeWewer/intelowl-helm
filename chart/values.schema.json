@@ -1889,6 +1889,12 @@
                             "items": {
                                 "type": "string"
                             }
+                        },
+                        "brokerTransportOptions": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
                         }
                     }
                 },
