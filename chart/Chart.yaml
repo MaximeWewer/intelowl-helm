@@ -2,8 +2,8 @@ apiVersion: v2
 name: intelowl
 description: A Helm chart for deploying IntelOwl - Open Source Intelligence Platform
 type: application
-version: 6.7.0-17-08-2026
-appVersion: "v6.7.0"
+version: 6.8.0-14-09-2026
+appVersion: "v6.8.0"
 
 keywords:
   - intelowl
@@ -32,7 +32,7 @@ dependencies:
 
   # CloudPirates Redis
   - name: redis
-    version: "0.34.*"
+    version: "0.35.*"
     repository: "oci://registry-1.docker.io/cloudpirates"
     condition: redis.enabled
 
