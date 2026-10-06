@@ -20,6 +20,9 @@ spec:
     spec:
       {{- include "intelowl.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "intelowl.serviceAccountName" . }}
+      {{- with include "intelowl.integrationsScheduling" . | trim }}
+      {{- . | nindent 6 }}
+      {{- end }}
       securityContext:
         runAsNonRoot: false
         runAsUser: 0

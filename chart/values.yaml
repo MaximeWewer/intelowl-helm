@@ -836,6 +836,12 @@ flower:
 # Optional Docker-based analyzers
 
 integrations:
+  # -- Node selector for all integration pods
+  nodeSelector: {}
+  # -- Tolerations for all integration pods
+  tolerations: []
+  # -- Affinity for all integration pods (e.g. co-location with RWO shared volumes)
+  affinity: {}
   # CyberChef integration (recipe-based data transformation)
   cyberchef:
     # -- Enable CyberChef integration

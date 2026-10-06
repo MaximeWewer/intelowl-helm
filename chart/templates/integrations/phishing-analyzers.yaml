@@ -26,6 +26,9 @@ spec:
     spec:
       {{- include "intelowl.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "intelowl.serviceAccountName" . }}
+      {{- with include "intelowl.integrationsScheduling" . | trim }}
+      {{- . | nindent 6 }}
+      {{- end }}
       containers:
         - name: selenium-hub
           image: "{{ .Values.integrations.phishingAnalyzers.selenium.hub.image.repository }}:{{ .Values.integrations.phishingAnalyzers.selenium.hub.image.tag }}"
@@ -107,6 +110,9 @@ spec:
     spec:
       {{- include "intelowl.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "intelowl.serviceAccountName" . }}
+      {{- with include "intelowl.integrationsScheduling" . | trim }}
+      {{- . | nindent 6 }}
+      {{- end }}
       containers:
         - name: chromium
           image: "{{ .Values.integrations.phishingAnalyzers.selenium.chromium.image.repository }}:{{ .Values.integrations.phishingAnalyzers.selenium.chromium.image.tag }}"
@@ -164,6 +170,9 @@ spec:
     spec:
       {{- include "intelowl.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "intelowl.serviceAccountName" . }}
+      {{- with include "intelowl.integrationsScheduling" . | trim }}
+      {{- . | nindent 6 }}
+      {{- end }}
       securityContext:
         runAsNonRoot: false
         runAsUser: 0
