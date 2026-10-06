@@ -29,6 +29,9 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with include "intelowl.podScheduling" .Values.migration | trim }}
+      {{- . | nindent 6 }}
+      {{- end }}
       restartPolicy: Never
       initContainers:
         {{- include "intelowl.waitForDbInitContainer" . | nindent 8 }}

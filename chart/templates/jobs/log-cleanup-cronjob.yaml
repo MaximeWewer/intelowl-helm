@@ -25,6 +25,9 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- with include "intelowl.podScheduling" .Values.logCleanup | trim }}
+          {{- . | nindent 10 }}
+          {{- end }}
           restartPolicy: Never
           containers:
             - name: log-cleanup

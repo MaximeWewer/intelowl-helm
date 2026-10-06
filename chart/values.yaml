@@ -1274,6 +1274,12 @@ migration:
   enabled: true
   # -- Migration timeout in seconds
   timeout: 600
+  # -- Node selector for the migration pod
+  nodeSelector: {}
+  # -- Tolerations for the migration pod
+  tolerations: []
+  # -- Affinity for the migration pod (e.g. co-location with RWO shared volumes)
+  affinity: {}
 
   resources:
     requests:
@@ -1758,6 +1764,12 @@ logCleanup:
   schedule: "0 2 * * *"
   # -- Number of days to retain log files
   retentionDays: 30
+  # -- Node selector for the logCleanup pod
+  nodeSelector: {}
+  # -- Tolerations for the logCleanup pod
+  tolerations: []
+  # -- Affinity for the logCleanup pod (e.g. co-location with RWO shared volumes)
+  affinity: {}
 
 # @section PostgreSQL parameters (CloudNative-PG)
 # Requires CloudNative-PG operator. See: https://cloudnative-pg.io/
