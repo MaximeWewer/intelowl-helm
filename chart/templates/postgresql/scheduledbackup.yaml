@@ -1,0 +1,18 @@
+{{- if and .Values.postgresql.enabled .Values.database.internal .Values.postgresql.backup.enabled .Values.postgresql.backup.schedule }}
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ include "intelowl.fullname" . }}-postgres
+  labels:
+    {{- include "intelowl.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  schedule: {{ .Values.postgresql.backup.schedule | quote }}
+  # First base backup right away, otherwise WAL has nothing to replay on.
+  immediate: true
+  backupOwnerReference: self
+  method: barmanObjectStore
+  target: prefer-standby
+  cluster:
+    name: {{ include "intelowl.fullname" . }}-postgres
+{{- end }}

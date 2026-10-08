@@ -1192,8 +1192,10 @@ Manages playbooks declaratively so they live in git instead of only in the datab
 | postgresql.backup.endpointURL | string | `""` | S3 endpoint URL |
 | postgresql.backup.retentionPolicy | string | `"30d"` | Backup retention policy |
 | postgresql.backup.s3Credentials.accessKeyIdKey | string | `"ACCESS_KEY_ID"` | Key for access key ID |
+| postgresql.backup.s3Credentials.regionKey | string | `""` | Key for the S3 region (empty: none). Required by most non-AWS S3 |
 | postgresql.backup.s3Credentials.secretAccessKeyKey | string | `"ACCESS_SECRET_KEY"` | Key for secret access key |
 | postgresql.backup.s3Credentials.secretName | string | `""` | Secret name containing S3 credentials |
+| postgresql.backup.schedule | string | `"0 0 2 * * *"` | Base backup schedule (CNPG 6-field cron, seconds first). Without a base backup, archived WAL cannot be replayed. Empty disables it. |
 | postgresql.database | string | `"intel_owl_db"` | Database name |
 | postgresql.enabled | bool | `true` | Enable PostgreSQL (creates CNPG Cluster resource) |
 | postgresql.existingSecret | string | `""` | Use existing secret for credentials |

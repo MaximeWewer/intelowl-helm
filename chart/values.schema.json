@@ -2735,10 +2735,16 @@
                         "retentionPolicy": {
                             "type": "string"
                         },
+                        "schedule": {
+                            "type": "string"
+                        },
                         "s3Credentials": {
                             "type": "object",
                             "properties": {
                                 "accessKeyIdKey": {
+                                    "type": "string"
+                                },
+                                "regionKey": {
                                     "type": "string"
                                 },
                                 "secretAccessKeyKey": {

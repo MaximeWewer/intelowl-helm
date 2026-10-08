@@ -1842,6 +1842,9 @@ postgresql:
     endpointURL: ""
     # -- Backup retention policy
     retentionPolicy: "30d"
+    # -- Base backup schedule (CNPG 6-field cron, seconds first). Without a
+    # base backup, archived WAL cannot be replayed. Empty disables it.
+    schedule: "0 0 2 * * *"
     s3Credentials:
       # -- Secret name containing S3 credentials
       secretName: ""
@@ -1849,6 +1852,8 @@ postgresql:
       accessKeyIdKey: "ACCESS_KEY_ID"
       # -- Key for secret access key
       secretAccessKeyKey: "ACCESS_SECRET_KEY"
+      # -- Key for the S3 region (empty: none). Required by most non-AWS S3
+      regionKey: ""
 
   monitoring:
     # -- Enable PostgreSQL monitoring
