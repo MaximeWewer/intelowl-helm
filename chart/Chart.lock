@@ -1,0 +1,15 @@
+dependencies:
+- name: cloudnative-pg
+  repository: https://cloudnative-pg.github.io/charts
+  version: 0.29.1
+- name: redis
+  repository: oci://registry-1.docker.io/cloudpirates
+  version: 0.35.6
+- name: rabbitmq
+  repository: oci://registry-1.docker.io/cloudpirates
+  version: 0.21.30
+- name: eck-operator
+  repository: https://helm.elastic.co
+  version: 3.5.0
+digest: sha256:01b7d6cf27b3e69829ae81f419b22c00bab40a660b233e9f34382691248a20b1
+generated: "2026-10-06T11:21:27.314639495+02:00"

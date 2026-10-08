@@ -74,6 +74,11 @@ spec:
         secretAccessKey:
           name: {{ .Values.postgresql.backup.s3Credentials.secretName }}
           key: {{ .Values.postgresql.backup.s3Credentials.secretAccessKeyKey | default "ACCESS_SECRET_KEY" }}
+        {{- with .Values.postgresql.backup.s3Credentials.regionKey }}
+        region:
+          name: {{ $.Values.postgresql.backup.s3Credentials.secretName }}
+          key: {{ . }}
+        {{- end }}
       {{- end }}
       wal:
         compression: gzip
