@@ -474,7 +474,7 @@ Kubernetes: `>=1.25.0-0`
 | https://cloudnative-pg.github.io/charts | cloudnative-pg | 0.29.* |
 | https://helm.elastic.co | eck-operator | 3.5.* |
 | oci://registry-1.docker.io/cloudpirates | rabbitmq | 0.21.* |
-| oci://registry-1.docker.io/cloudpirates | redis | 0.34.* |
+| oci://registry-1.docker.io/cloudpirates | redis | 0.35.* |
 
 ## Values
 
@@ -525,7 +525,7 @@ Kubernetes: `>=1.25.0-0`
 | app.slack.enabled | bool | `false` | Enable Slack notifications |
 | app.slack.existingSecret | string | `""` | Use existing secret for Slack token (key: slack-token) |
 | app.slack.token | string | `""` | Slack API token |
-| app.version | string | `"v6.7.0"` | IntelOwl application version |
+| app.version | string | `"v6.8.0"` | IntelOwl application version |
 
 ### Authentication parameters
 
@@ -851,6 +851,7 @@ External authentication backends. Mirrors the upstream documentation: https://in
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| integrations.affinity | object | `{}` | Affinity for all integration pods (e.g. co-location with RWO shared volumes) |
 | integrations.bbot.enabled | bool | `false` | Enable BBOT integration |
 | integrations.bbot.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy |
 | integrations.bbot.image.repository | string | `"intelowlproject/intelowl_bbot_analyzer"` | BBOT image repository |
@@ -878,6 +879,7 @@ External authentication backends. Mirrors the upstream documentation: https://in
 | integrations.malwareTools.resources.requests.cpu | string | `"250m"` | CPU request |
 | integrations.malwareTools.resources.requests.memory | string | `"512Mi"` | Memory request |
 | integrations.malwareTools.service.port | int | `4002` | Service port |
+| integrations.nodeSelector | object | `{}` | Node selector for all integration pods |
 | integrations.nuclei.enabled | bool | `false` | Enable Nuclei integration |
 | integrations.nuclei.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy |
 | integrations.nuclei.image.repository | string | `"intelowlproject/intelowl_nuclei_analyzer"` | Nuclei image repository |
@@ -947,6 +949,7 @@ External authentication backends. Mirrors the upstream documentation: https://in
 | integrations.thug.resources.requests.cpu | string | `"250m"` | CPU request |
 | integrations.thug.resources.requests.memory | string | `"512Mi"` | Memory request |
 | integrations.thug.service.port | int | `4002` | Service port |
+| integrations.tolerations | list | `[]` | Tolerations for all integration pods |
 | integrations.torAnalyzers.enabled | bool | `false` | Enable Tor Analyzers integration |
 | integrations.torAnalyzers.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy |
 | integrations.torAnalyzers.image.repository | string | `"intelowlproject/intelowl_tor_analyzers"` | Tor Analyzers image repository |
@@ -1007,12 +1010,15 @@ External authentication backends. Mirrors the upstream documentation: https://in
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| migration.affinity | object | `{}` | Affinity for the migration pod (e.g. co-location with RWO shared volumes) |
 | migration.enabled | bool | `true` | Enable migration job as pre-install/pre-upgrade hook |
+| migration.nodeSelector | object | `{}` | Node selector for the migration pod |
 | migration.resources.limits.cpu | string | `"500m"` | CPU limit for migration job |
 | migration.resources.limits.memory | string | `"1Gi"` | Memory limit for migration job |
 | migration.resources.requests.cpu | string | `"250m"` | CPU request for migration job |
 | migration.resources.requests.memory | string | `"512Mi"` | Memory request for migration job |
 | migration.timeout | int | `600` | Migration timeout in seconds |
+| migration.tolerations | list | `[]` | Tolerations for the migration pod |
 
 ### External Secrets parameters
 
@@ -1033,6 +1039,7 @@ External authentication backends. Mirrors the upstream documentation: https://in
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| metrics.celery.brokerTransportOptions | list | `["sep=:"]` | Broker transport options passed to celery-exporter, as `key=value`. MUST stay aligned with IntelOwl's own `broker_transport_options` (intel_owl/settings/celery.py), because both clients share the broker.  `sep=:` is REQUIRED with Redis. IntelOwl overrides kombu's default binding separator (`\x06\x16`) with `:`. An exporter left on the default writes `_kombu.binding.celeryev` and `_kombu.binding.reply.celery.pidbox` in the other format; the workers then fail to parse them (`ValueError: not enough values to unpack (expected 3, got 1)`) while publishing their `worker-online` event. They die before starting their consumers, so they never become ready, consume nothing, and are killed by the liveness probe every few minutes. |
 | metrics.celery.enabled | bool | `false` | Enable the celery-exporter deployment and task events on Celery workers |
 | metrics.celery.extraArgs | list | `[]` | Extra CLI args for celery-exporter |
 | metrics.celery.image.pullPolicy | string | `"IfNotPresent"` | celery-exporter image pull policy |
@@ -1122,7 +1129,7 @@ External authentication backends. Mirrors the upstream documentation: https://in
 | elasticsearch.storage.size | string | `"30Gi"` | Storage size for Elasticsearch data |
 | elasticsearch.storage.storageClass | string | `""` | Storage class |
 | elasticsearch.tolerations | list | `[]` | Tolerations for Elasticsearch pods |
-| elasticsearch.version | string | `"8.19.19"` | Elasticsearch version |
+| elasticsearch.version | string | `"8.19.22"` | Elasticsearch version |
 
 ### Superuser parameters
 
@@ -1161,6 +1168,7 @@ Manages playbooks declaratively so they live in git instead of only in the datab
 | playbooks.definitions | list | `[]` | Playbook definitions. Required per entry: `name`, `description`, `type`, `tlp`. `type`: ip, url, domain, hash, generic, file `tlp` : CLEAR, GREEN, AMBER, RED Optional: analyzers, connectors, pivots (lists of plugin names), disabled, starting, scan_mode (1=force new, 2=check previous), runtime_configuration. See examples/with-playbooks.yaml for a complete set. |
 | playbooks.enabled | bool | `false` | Enable declarative playbook management |
 | playbooks.owner | string | `""` | Username owning the created playbooks. Empty means no owner, i.e. a global playbook visible to every user (recommended for GitOps). If set, the user must already exist — see `superuser.username`. |
+| playbooks.pivots | list | `[]` | Custom pivot definitions, reconciled with the playbooks so a pivot and the playbooks it links can reference each other in the same sync. Required per entry: `name`, `python_module` (module of a pivot already in the image, e.g. any_compare.AnyCompare, compare.Compare, load_file.LoadFile) and `playbooks` (playbooks the pivot starts). Optional: description, analyzers or connectors (plugins whose report the pivot reads), disabled, routing_key, soft_time_limit, params (parameter name -> value). A playbook lists the pivot in its own `pivots` field. |
 | playbooks.resources.limits.cpu | string | `"500m"` |  |
 | playbooks.resources.limits.memory | string | `"512Mi"` |  |
 | playbooks.resources.requests.cpu | string | `"100m"` |  |
@@ -1178,9 +1186,12 @@ Manages playbooks declaratively so they live in git instead of only in the datab
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| logCleanup.affinity | object | `{}` | Affinity for the logCleanup pod (e.g. co-location with RWO shared volumes) |
 | logCleanup.enabled | bool | `false` | Enable log cleanup CronJob |
+| logCleanup.nodeSelector | object | `{}` | Node selector for the logCleanup pod |
 | logCleanup.retentionDays | int | `30` | Number of days to retain log files |
 | logCleanup.schedule | string | `"0 2 * * *"` | Cron schedule (default: every day at 2:00 AM) |
+| logCleanup.tolerations | list | `[]` | Tolerations for the logCleanup pod |
 
 ### PostgreSQL parameters (CloudNative-PG)
 

@@ -2558,6 +2558,62 @@
                             }
                         }
                     }
+                },
+                "pivots": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "name",
+                            "python_module",
+                            "playbooks"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "python_module": {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            "analyzers": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "connectors": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "playbooks": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "disabled": {
+                                "type": "boolean"
+                            },
+                            "routing_key": {
+                                "type": "string"
+                            },
+                            "soft_time_limit": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "params": {
+                                "type": "object"
+                            }
+                        }
+                    }
                 }
             }
         },

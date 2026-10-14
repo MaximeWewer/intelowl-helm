@@ -1,4 +1,4 @@
-{{- if and .Values.playbooks.enabled .Values.playbooks.definitions }}
+{{- if and .Values.playbooks.enabled (or .Values.playbooks.definitions .Values.playbooks.pivots) }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -18,7 +18,7 @@ metadata:
     "helm.sh/hook-weight": "10"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
     {{- end }}
-    checksum/playbooks: {{ toJson .Values.playbooks.definitions | sha256sum }}
+    checksum/playbooks: {{ toJson (list .Values.playbooks.definitions .Values.playbooks.pivots) | sha256sum }}
 spec:
   backoffLimit: 3
   activeDeadlineSeconds: 600

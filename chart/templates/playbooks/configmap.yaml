@@ -1,4 +1,4 @@
-{{- if and .Values.playbooks.enabled .Values.playbooks.definitions }}
+{{- if and .Values.playbooks.enabled (or .Values.playbooks.definitions .Values.playbooks.pivots) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -12,13 +12,20 @@ metadata:
   {{- end }}
 data:
   playbooks.json: |-
-    {{- toJson .Values.playbooks.definitions | nindent 4 }}
+    {{- toJson (.Values.playbooks.definitions | default list) | nindent 4 }}
+
+  pivots.json: |-
+    {{- toJson (.Values.playbooks.pivots | default list) | nindent 4 }}
 
   reconcile.py: |-
-    """Reconcile IntelOwl playbooks from a declarative definition file.
+    """Reconcile IntelOwl playbooks and custom pivots from declarative files.
 
-    Idempotent: playbooks are matched on `name`, created when missing and
-    updated in place otherwise. Nothing is ever deleted.
+    Idempotent: playbooks and pivots are matched on `name`, created when
+    missing and updated in place otherwise. Nothing is ever deleted.
+
+    Order: playbooks first (without their pivots), then pivots (which start
+    playbooks), then the playbook -> pivot links, so both sides can reference
+    each other in a single sync.
     """
     import json
     import os
@@ -32,7 +39,9 @@ data:
     from django.contrib.auth import get_user_model
 
     from api_app.analyzers_manager.models import AnalyzerConfig
+    from api_app.choices import PythonModuleBasePaths
     from api_app.connectors_manager.models import ConnectorConfig
+    from api_app.models import Parameter, PluginConfig, PythonModule
     from api_app.pivots_manager.models import PivotConfig
     from api_app.playbooks_manager.models import PlaybookConfig
 
@@ -53,8 +62,9 @@ data:
     RELATIONS = (
         ("analyzers", AnalyzerConfig),
         ("connectors", ConnectorConfig),
-        ("pivots", PivotConfig),
     )
+    # Pivot fields copied verbatim when present in a definition.
+    PIVOT_FIELDS = ("description", "disabled", "routing_key", "soft_time_limit")
 
     problems = []
 
@@ -68,8 +78,15 @@ data:
             )
         return found
 
-    with open("/config/playbooks.json") as handle:
-        definitions = json.load(handle)
+    def load(path):
+        try:
+            with open(path) as handle:
+                return json.load(handle)
+        except FileNotFoundError:
+            return []
+
+    definitions = load("/config/playbooks.json")
+    pivot_definitions = load("/config/pivots.json")
 
     owner = None
     if OWNER_NAME:
@@ -101,7 +118,63 @@ data:
             "created" if created else "updated", name, playbook.analyzers.count()
         ))
 
-    print("done: %d created, %d updated" % (created_count, updated_count))
+    # --- pivots -------------------------------------------------------------
+    pivots_count = 0
+    for definition in pivot_definitions:
+        name = definition["name"]
+        module = PythonModule.objects.filter(
+            module=definition["python_module"],
+            base_path=PythonModuleBasePaths.Pivot.value,
+        ).first()
+        if module is None:
+            problems.append("pivot %r: unknown python_module %r" % (name, definition["python_module"]))
+            continue
+
+        fields = {key: definition[key] for key in PIVOT_FIELDS if key in definition}
+        fields["python_module"] = module
+        # description is mandatory on the model.
+        fields.setdefault("description", "Pivot %s" % name)
+        pivot, created = PivotConfig.objects.update_or_create(name=name, defaults=fields)
+
+        pivot.related_analyzer_configs.set(
+            resolve(AnalyzerConfig, definition.get("analyzers", []), name, "analyzers")
+        )
+        pivot.related_connector_configs.set(
+            resolve(ConnectorConfig, definition.get("connectors", []), name, "connectors")
+        )
+        pivot.playbooks_choice.set(
+            resolve(PlaybookConfig, definition["playbooks"], name, "playbooks")
+        )
+
+        for param_name, value in (definition.get("params") or {}).items():
+            parameter = Parameter.objects.filter(name=param_name, python_module=module).first()
+            if parameter is None:
+                problems.append("pivot %r: unknown parameter %r" % (name, param_name))
+                continue
+            PluginConfig.objects.update_or_create(
+                parameter=parameter,
+                owner=None,
+                for_organization=False,
+                pivot_config=pivot,
+                defaults={"value": value},
+            )
+
+        pivots_count += 1
+        print("%s pivot %r -> %s" % (
+            "created" if created else "updated", name, ", ".join(definition["playbooks"])
+        ))
+
+    # --- playbook -> pivot links (pivots now exist) -------------------------
+    for definition in definitions:
+        if "pivots" in definition:
+            playbook = PlaybookConfig.objects.get(name=definition["name"])
+            playbook.pivots.set(
+                resolve(PivotConfig, definition["pivots"], definition["name"], "pivots")
+            )
+
+    print("done: %d playbook(s) created, %d updated, %d pivot(s)" % (
+        created_count, updated_count, pivots_count
+    ))
 
     if problems:
         print("\n%d warning(s):" % len(problems))

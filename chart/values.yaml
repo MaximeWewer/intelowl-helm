@@ -1736,6 +1736,21 @@ playbooks:
   #     - MISP
   #     - YETI
   #     - GreyNoiseCommunity
+  # -- Custom pivot definitions, reconciled with the playbooks so a pivot and
+  # the playbooks it links can reference each other in the same sync.
+  # Required per entry: `name`, `python_module` (module of a pivot already in
+  # the image, e.g. any_compare.AnyCompare, compare.Compare, load_file.LoadFile)
+  # and `playbooks` (playbooks the pivot starts).
+  # Optional: description, analyzers or connectors (plugins whose report the
+  # pivot reads), disabled, routing_key, soft_time_limit, params (parameter
+  # name -> value). A playbook lists the pivot in its own `pivots` field.
+  pivots: []
+  # - name: CTI_Pivot_ResolvedIP_to_Enrich
+  #   python_module: any_compare.AnyCompare
+  #   analyzers: [Classic_DNS]
+  #   playbooks: [CTI_Enrich_IP]
+  #   params:
+  #     field_to_compare: resolutions.0.data
 
   resources:
     requests:
